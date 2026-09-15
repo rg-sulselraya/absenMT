@@ -112,14 +112,24 @@ function setLoginRole(role) {
   $$('.role-option').forEach(button => button.classList.toggle('active', button.dataset.loginRole === role));
   const label = $('.field-label[for="login-id"]');
   const input = $('#login-id');
+  const pinLabel = $('.field-label[for="login-pin"]');
+  const pinInput = $('#login-pin');
   if (role === 'admin') {
     label.textContent = 'ID Admin';
     input.placeholder = 'Contoh: admin';
     input.value = input.value === 'MT001' ? '' : input.value;
+    pinLabel.textContent = 'PIN / Password';
+    pinInput.placeholder = 'Masukkan PIN atau password admin';
+    pinInput.removeAttribute('maxlength');
+    pinInput.removeAttribute('inputmode');
   } else {
     label.textContent = 'ID Master Teacher';
     input.placeholder = 'Contoh: MT001';
     input.value = input.value === 'admin' ? '' : input.value;
+    pinLabel.textContent = 'PIN 6 digit';
+    pinInput.placeholder = 'Masukkan 6 digit PIN';
+    pinInput.maxLength = 6;
+    pinInput.inputMode = 'numeric';
   }
 }
 
@@ -407,7 +417,7 @@ async function renderTeachers() {
     return;
   }
   state.teachers = payload.teachers || [];
-  $('#page-content').innerHTML = `${pageHeading('Master Teacher', 'Data utama dibaca dari tab Google Sheet “Master Teacher”.')}<section class="card table-card"><div class="card-header"><div><h3>Daftar Master Teacher</h3><p>${state.teachers.length} akun terbaca dari Google Sheet</p></div><span class="page-intro-badge">SOURCE: GOOGLE SHEETS</span></div>${state.teachers.length ? `<div class="table-scroll"><table class="attendance-table"><thead><tr><th>ID MT</th><th>Nama Master Teacher</th><th>Cabang Utama</th><th>Status</th></tr></thead><tbody>${state.teachers.map(teacher => `<tr><td><strong>${escapeHtml(teacher.id)}</strong></td><td><div class="teacher-cell"><span class="mini-avatar">${initials(teacher.name)}</span><div><strong>${escapeHtml(teacher.name)}</strong></div></div></td><td><div class="branch-cell"><strong>${escapeHtml(branchName(teacher.branchId))}</strong><small>${escapeHtml(teacher.branchId || '—')}</small></div></td><td>${teacher.status === 'active' ? '<span class="status-pill green">Aktif</span>' : `<span class="status-pill neutral">${escapeHtml(teacher.statusLabel || 'Nonaktif')}</span>`}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><strong>Belum ada data Master Teacher di Google Sheet</strong><span>Tambahkan baris pada tab “Master Teacher”, lalu muat ulang.</span></div>`}<div class="table-footer"><span>Pengelolaan data dilakukan di Google Sheet.</span><span>Login/PIN tetap memakai cache backend lokal.</span></div></section>`;
+  $('#page-content').innerHTML = `${pageHeading('Master Teacher', 'Data utama dibaca dari tab Google Sheet “Master Teacher”.')}<section class="card table-card"><div class="card-header"><div><h3>Daftar Master Teacher</h3><p>${state.teachers.length} akun terbaca dari Google Sheet</p></div><span class="page-intro-badge">SOURCE: GOOGLE SHEETS</span></div>${state.teachers.length ? `<div class="table-scroll"><table class="attendance-table"><thead><tr><th>ID MT</th><th>Nama Master Teacher</th><th>Cabang Utama</th><th>Status</th><th>Status PIN</th><th>Aksi</th></tr></thead><tbody>${state.teachers.map(teacher => `<tr><td><strong>${escapeHtml(teacher.id)}</strong></td><td><div class="teacher-cell"><span class="mini-avatar">${initials(teacher.name)}</span><div><strong>${escapeHtml(teacher.name)}</strong></div></div></td><td><div class="branch-cell"><strong>${escapeHtml(branchName(teacher.branchId))}</strong><small>${escapeHtml(teacher.branchId || '—')}</small></div></td><td>${teacher.status === 'active' ? '<span class="status-pill green">Aktif</span>' : `<span class="status-pill neutral">${escapeHtml(teacher.statusLabel || 'Nonaktif')}</span>`}</td><td>${teacher.pinConfigured ? '<span class="status-pill green">Sudah dibuat</span>' : '<span class="status-pill neutral">Belum dibuat</span>'}</td><td><button class="tiny-button approve" data-action="set-pin" data-teacher-id="${escapeHtml(teacher.id)}">${teacher.pinConfigured ? 'Reset PIN' : 'Buat PIN'}</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty-state"><strong>Belum ada data Master Teacher di Google Sheet</strong><span>Tambahkan baris pada tab “Master Teacher”, lalu muat ulang.</span></div>`}<div class="table-footer"><span>Identitas dan status berasal dari Google Sheet.</span><span>PIN hanya disimpan sebagai hash di backend lokal.</span></div></section>`;
   bindContentEvents();
 }
 
@@ -485,6 +495,7 @@ function bindContentEvents() {
   $$('#page-content [data-record-id]').forEach(element => element.addEventListener('click', event => { if (event.target.closest('button')?.dataset.action === 'refresh-page') return; const id = element.dataset.recordId; const record = [...(state.records || []), ...(state.dashboard?.rows || []).flatMap(row => [row.masuk, row.pulang].filter(Boolean))].find(item => item?.attendanceId === id); if (record) openRecordModal(record); }));
   $$('#page-content [data-action="add-teacher"]').forEach(button => button.addEventListener('click', () => openTeacherModal()));
   $$('#page-content [data-action="edit-teacher"]').forEach(button => button.addEventListener('click', () => openTeacherModal(state.teachers.find(teacher => teacher.id === button.dataset.teacherId))));
+  $$('#page-content [data-action="set-pin"]').forEach(button => button.addEventListener('click', () => openPinModal(state.teachers.find(teacher => teacher.id === button.dataset.teacherId))));
   $$('#page-content [data-action="add-branch"]').forEach(button => button.addEventListener('click', () => openBranchModal()));
   $$('#page-content [data-action="print-qr"]').forEach(button => button.addEventListener('click', () => window.print()));
   $$('#page-content [data-device-action]').forEach(button => button.addEventListener('click', () => updateDevice(button.dataset.deviceId, button.dataset.deviceAction)));
@@ -498,6 +509,30 @@ function openModal(content) {
 }
 
 function closeModal() { $('#modal-root').innerHTML = ''; }
+
+function openPinModal(teacher) {
+  if (!teacher) return;
+  const action = teacher.pinConfigured ? 'Reset PIN' : 'Buat PIN';
+  openModal(`<div class="modal-header"><div><h3>${action} Master Teacher</h3><p>${escapeHtml(teacher.name)} · ${escapeHtml(teacher.id)}</p></div><button class="modal-close">×</button></div><div class="modal-body"><form id="teacher-pin-form"><div class="form-grid"><div class="form-field"><label>PIN baru (6 digit)</label><input name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{6}" required placeholder="Contoh: 482731" /></div><div class="form-field"><label>Konfirmasi PIN</label><input name="confirmation" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{6}" required placeholder="Ulangi PIN baru" /></div></div><p class="form-note">PIN tidak disimpan di Google Sheet dan tidak ditampilkan kembali setelah disimpan.</p><div class="form-actions"><button type="button" class="secondary-button modal-cancel">Batal</button><button type="submit" class="primary-button">${action}</button></div></form></div>`);
+  $('.modal-cancel').addEventListener('click', closeModal);
+  $('#teacher-pin-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+    if (!/^\d{6}$/.test(data.pin)) return showToast('PIN harus terdiri dari tepat 6 digit.', 'error');
+    if (data.pin !== data.confirmation) return showToast('Konfirmasi PIN tidak sama.', 'error');
+    const submit = event.currentTarget.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      await api(`/api/teachers/${encodeURIComponent(teacher.id)}/pin`, { method: 'POST', body: JSON.stringify({ pin: data.pin }) });
+      closeModal();
+      showToast(`${action} berhasil disimpan.`, 'success');
+      await renderTeachers();
+    } catch (err) {
+      showToast(err.message, 'error');
+      submit.disabled = false;
+    }
+  });
+}
 
 function openRecordModal(record) {
   openModal(`<div class="modal-header"><div><h3>Detail absensi</h3><p>${escapeHtml(record.attendanceId)}</p></div><button class="modal-close">×</button></div><div class="modal-body"><div class="detail-grid"><div class="detail-item"><span>Master Teacher</span><strong>${escapeHtml(record.mtName)} · ${escapeHtml(record.mtId)}</strong></div><div class="detail-item"><span>Tanggal</span><strong>${humanDate(record.date)}</strong></div><div class="detail-item"><span>Cabang QR</span><strong>${escapeHtml(record.branchName)} · ${escapeHtml(record.branchId)}</strong></div><div class="detail-item"><span>Jenis / jam scan</span><strong>${escapeHtml(record.type)} · ${escapeHtml(record.time)}</strong></div><div class="detail-item"><span>Latitude</span><strong>${record.latitude}</strong></div><div class="detail-item"><span>Longitude</span><strong>${record.longitude}</strong></div><div class="detail-item"><span>Jarak dari cabang</span><strong>${formatDistance(record.distanceMeters)}</strong></div><div class="detail-item"><span>Status lokasi</span><strong>${statusPill(record, record.locationStatus)}</strong></div><div class="detail-item detail-full"><span>Device / session identifier</span><strong>${escapeHtml(record.deviceId || '—')}</strong></div></div></div><div class="modal-footer"><a class="maps-link" target="_blank" rel="noreferrer" href="https://www.google.com/maps?q=${encodeURIComponent(record.latitude)},${encodeURIComponent(record.longitude)}">Lihat Lokasi di Google Maps ↗</a></div>`);

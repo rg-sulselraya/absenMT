@@ -9,12 +9,9 @@ cp .env.example .env
 npm start
 ```
 
-Buka <http://localhost:3000>. Data pilot tersimpan di `data/store.json`. Akun awal:
+Buka <http://localhost:3000>. Data pilot tersimpan di `data/store.json`. Akun Admin awal mengikuti `SEED_ADMIN_PIN` di `.env` (contoh lokal: `admin` / `admin123`).
 
-- Master Teacher: `MT001` / `1234`
-- Admin: `admin` / `admin123`
-
-PIN awal langsung di-hash dengan `scrypt` saat store pertama dibuat. Ganti nilai seed di `.env` sebelum menjalankan pertama kali di lingkungan baru. Jangan menghapus atau membagikan `data/store.json` karena berisi data operasional.
+Master Teacher harus tercatat di tab Google Sheet `Master Teacher`, berstatus `Aktif`, dan memakai PIN tepat 6 digit. Admin membuat atau mereset PIN dari menu **Master Teacher** melalui tombol **Buat PIN** atau **Reset PIN**. PIN tidak ditulis ke Google Sheet; backend hanya menyimpan hash `scrypt` di `data/store.json`. Jangan menghapus atau membagikan `data/store.json` karena berisi data operasional.
 
 ## Setup Google Sheets via Google Apps Script
 
@@ -60,7 +57,9 @@ Masuk sebagai Admin, buka menu `Cabang`, lalu isi latitude, longitude resmi, ala
 
 ## Master Teacher dan device
 
-Admin dapat menambah Master Teacher melalui menu `Master Teacher`. PIN hanya dikirim saat membuat/mengubah akun dan disimpan sebagai hash.
+Tambahkan atau ubah identitas Master Teacher di tab Google Sheet `Master Teacher` dengan header `ID MT`, `Nama Master Teacher`, `Cabang Utama`, dan `Status`. Setelah refresh, data tersebut muncul di menu `Master Teacher`. Admin kemudian memilih **Buat PIN** untuk membuat PIN 6 digit, atau **Reset PIN** jika perlu menggantinya. Perubahan PIN hanya disimpan sebagai hash di cache backend lokal; PIN asli tidak pernah dikirim ke Google Sheet atau frontend.
+
+Saat login MT, backend lebih dulu membaca tab `Master Teacher` untuk memvalidasi ID dan status. Jika Google Sheet tidak dapat diakses, login ditolak dengan pesan koneksi—backend tidak diam-diam memakai data lokal untuk validasi identitas. Cache lokal hanya menyimpan hash PIN dan data operasional yang sudah ada.
 
 Saat login pertama dari perangkat baru, aplikasi mencatat device sebagai `Menunggu otorisasi`. Admin buka menu `Pengaturan`, lalu klik `Otorisasi` pada device tersebut. Admin juga dapat mereset device (kembali ke pending), atau mencabutnya.
 

@@ -117,7 +117,7 @@ function loadStore() {
       id: 'MT001',
       name: 'Andi',
       branchId: 'CAB-HRT',
-      pinHash: hashPin(process.env.SEED_MT_PIN || '1234'),
+      pinHash: hashPin(process.env.SEED_MT_PIN || '123456'),
       status: 'active',
       createdAt: nowIso(),
     }],
@@ -224,7 +224,31 @@ function findBranch(id) {
 }
 
 function findTeacher(id) {
-  return store.teachers.find(teacher => teacher.id === id);
+  const normalizedId = String(id || '').trim().toUpperCase();
+  return store.teachers.find(teacher => String(teacher.id || '').trim().toUpperCase() === normalizedId);
+}
+
+function findSheetTeacher(teachers, id) {
+  const normalizedId = String(id || '').trim().toUpperCase();
+  return teachers.find(teacher => String(teacher.id || '').trim().toUpperCase() === normalizedId);
+}
+
+function resolveBranchId(value) {
+  const reference = String(value || '').trim();
+  if (!reference) return '';
+  const branch = store.branches.find(item => [item.id, item.name].some(candidate => String(candidate || '').trim().toLowerCase() === reference.toLowerCase()));
+  return branch?.id || reference;
+}
+
+function syncTeacherCache(sheetTeacher) {
+  const id = String(sheetTeacher.id || '').trim().toUpperCase();
+  let teacher = findTeacher(id);
+  if (!teacher) return null;
+  teacher.id = id;
+  teacher.name = sheetTeacher.name;
+  teacher.branchId = resolveBranchId(sheetTeacher.branchId);
+  teacher.status = sheetTeacher.status;
+  return teacher;
 }
 
 function haversineMeters(latitude1, longitude1, latitude2, longitude2) {
@@ -603,8 +627,26 @@ async function handleApi(req, res, pathname, query) {
     const identifier = String(input.id || '').trim().toUpperCase();
     const pin = String(input.pin || '');
     const deviceId = String(input.deviceId || '').trim().slice(0, 120);
-    const account = role === 'admin' ? store.admins.find(item => item.id.toUpperCase() === identifier) : findTeacher(identifier);
-    if (!account || account.status !== 'active' || !verifyPin(pin, account.pinHash)) return error(res, 401, 'ID atau PIN tidak cocok.', 'INVALID_CREDENTIALS');
+    let account;
+    if (role === 'admin') {
+      account = store.admins.find(item => item.id.toUpperCase() === identifier);
+      if (!account || account.status !== 'active' || !verifyPin(pin, account.pinHash)) return error(res, 401, 'ID atau PIN tidak cocok.', 'INVALID_CREDENTIALS');
+    } else {
+      let sheetTeachers;
+      try {
+        const sheets = await readGoogleSheets(['Master Teacher']);
+        sheetTeachers = parseMasterTeachers(sheets.values['Master Teacher']);
+      } catch (err) {
+        return error(res, 503, `Google Sheet tidak dapat memvalidasi login: ${err.message}`, err.code || 'GOOGLE_LOGIN_VALIDATION_FAILED');
+      }
+      const sheetTeacher = findSheetTeacher(sheetTeachers, identifier);
+      if (!sheetTeacher) return error(res, 401, 'Tidak dapat login. ID Master Teacher tidak ditemukan.', 'TEACHER_NOT_FOUND');
+      if (sheetTeacher.status !== 'active') return error(res, 403, 'Akun Master Teacher tidak aktif.', 'TEACHER_INACTIVE');
+      if (!/^\d{6}$/.test(pin)) return error(res, 400, 'PIN Master Teacher harus terdiri dari 6 digit.', 'INVALID_PIN_FORMAT');
+      account = syncTeacherCache(sheetTeacher);
+      if (!account || !account.pinHash || !verifyPin(pin, account.pinHash)) return error(res, 401, 'ID Master Teacher atau PIN salah.', 'INVALID_CREDENTIALS');
+      persist();
+    }
     let device = null;
     if (role === 'teacher') {
       if (!deviceId) return error(res, 400, 'Perangkat tidak dapat diidentifikasi.', 'DEVICE_REQUIRED');
@@ -651,7 +693,8 @@ async function handleApi(req, res, pathname, query) {
     if (session.role !== 'admin') return error(res, 403, 'Khusus Admin.', 'FORBIDDEN');
     try {
       const sheets = await readGoogleSheets(['Master Teacher']);
-      return json(res, 200, { ok: true, source: 'google-sheets', teachers: parseMasterTeachers(sheets.values['Master Teacher']) });
+      const teachers = parseMasterTeachers(sheets.values['Master Teacher']).map(teacher => ({ ...teacher, pinConfigured: Boolean(findTeacher(teacher.id)?.pinHash) }));
+      return json(res, 200, { ok: true, source: 'google-sheets', teachers });
     } catch (err) {
       return error(res, 503, err.message, err.code || 'GOOGLE_CONNECTION_FAILED');
     }
@@ -669,6 +712,17 @@ async function handleApi(req, res, pathname, query) {
     }
     const branches = session.role === 'admin' ? store.branches : store.branches.filter(branch => branch.active);
     return json(res, 200, { ok: true, branches: branches.map(publicBranch) });
+  }
+
+  if (pathname === '/api/teacher-pin-status' && req.method === 'GET') {
+    if (session.role !== 'admin') return error(res, 403, 'Khusus Admin.', 'FORBIDDEN');
+    try {
+      const sheets = await readGoogleSheets(['Master Teacher']);
+      const statuses = parseMasterTeachers(sheets.values['Master Teacher']).map(teacher => ({ id: teacher.id, hasPin: Boolean(findTeacher(teacher.id)?.pinHash) }));
+      return json(res, 200, { ok: true, source: 'google-sheets', statuses });
+    } catch (err) {
+      return error(res, 503, err.message, err.code || 'GOOGLE_CONNECTION_FAILED');
+    }
   }
 
   if (pathname === '/api/dashboard' && req.method === 'GET') {
@@ -799,11 +853,42 @@ async function handleApi(req, res, pathname, query) {
     const id = String(input.id || '').trim().toUpperCase();
     const name = String(input.name || '').trim();
     const pin = String(input.pin || '');
-    if (!/^[A-Z0-9_-]{3,30}$/.test(id) || !name || pin.length < 4 || !findBranch(input.branchId)) return error(res, 400, 'ID, nama, PIN minimal 4 digit, dan cabang wajib valid.', 'INVALID_TEACHER');
+    if (!/^[A-Z0-9_-]{3,30}$/.test(id) || !name || !/^\d{6}$/.test(pin) || !findBranch(input.branchId)) return error(res, 400, 'ID, nama, PIN 6 digit, dan cabang wajib valid.', 'INVALID_TEACHER');
     if (findTeacher(id)) return error(res, 409, 'ID Master Teacher sudah digunakan.', 'DUPLICATE_ID');
     store.teachers.push({ id, name, branchId: String(input.branchId), pinHash: hashPin(pin), status: 'active', createdAt: nowIso() });
     persist();
     return json(res, 201, { ok: true, teacher: safeTeacher(findTeacher(id)) });
+  }
+
+  const pinMatch = pathname.match(/^\/api\/teachers\/([^/]+)\/pin$/);
+  if (pinMatch && req.method === 'POST') {
+    if (session.role !== 'admin') return error(res, 403, 'Khusus Admin.', 'FORBIDDEN');
+    const id = decodeURIComponent(pinMatch[1]).trim().toUpperCase();
+    let input;
+    try { input = await body(req); } catch (err) { return error(res, 400, err.message, 'INVALID_JSON'); }
+    const pin = String(input.pin || '');
+    if (!/^\d{6}$/.test(pin)) return error(res, 400, 'PIN harus terdiri dari tepat 6 digit.', 'INVALID_PIN_FORMAT');
+    let sheetTeacher;
+    try {
+      const sheets = await readGoogleSheets(['Master Teacher']);
+      sheetTeacher = findSheetTeacher(parseMasterTeachers(sheets.values['Master Teacher']), id);
+    } catch (err) {
+      return error(res, 503, `Google Sheet tidak dapat memvalidasi Master Teacher: ${err.message}`, err.code || 'GOOGLE_CONNECTION_FAILED');
+    }
+    if (!sheetTeacher) return error(res, 404, 'ID Master Teacher tidak ditemukan di Google Sheet.', 'TEACHER_NOT_FOUND');
+    if (sheetTeacher.status !== 'active') return error(res, 409, 'Akun Master Teacher tidak aktif.', 'TEACHER_INACTIVE');
+    let teacher = findTeacher(id);
+    if (!teacher) {
+      teacher = { id, name: sheetTeacher.name, branchId: resolveBranchId(sheetTeacher.branchId), status: 'active', createdAt: nowIso() };
+      store.teachers.push(teacher);
+    } else {
+      teacher.name = sheetTeacher.name;
+      teacher.branchId = resolveBranchId(sheetTeacher.branchId);
+      teacher.status = 'active';
+    }
+    teacher.pinHash = hashPin(pin);
+    persist();
+    return json(res, 200, { ok: true, teacher: safeTeacher(teacher), pinConfigured: true });
   }
 
   const teacherMatch = pathname.match(/^\/api\/teachers\/([^/]+)$/);
@@ -817,7 +902,10 @@ async function handleApi(req, res, pathname, query) {
     if (input.branchId !== undefined && !findBranch(input.branchId)) return error(res, 400, 'Cabang tidak valid.', 'INVALID_BRANCH');
     if (input.branchId !== undefined) teacher.branchId = String(input.branchId);
     if (input.status !== undefined) teacher.status = input.status === 'active' ? 'active' : 'inactive';
-    if (input.pin) teacher.pinHash = hashPin(String(input.pin));
+    if (input.pin !== undefined) {
+      if (!/^\d{6}$/.test(String(input.pin))) return error(res, 400, 'PIN harus terdiri dari tepat 6 digit.', 'INVALID_PIN_FORMAT');
+      teacher.pinHash = hashPin(String(input.pin));
+    }
     persist();
     return json(res, 200, { ok: true, teacher: safeTeacher(teacher) });
   }
