@@ -1,0 +1,10 @@
+.env
+.env.local
+data/store.json
+data/*.json
+service-account*.json
+google-apps-script-token*.txt
+node_modules/
+work/
+outputs/
+.DS_Store

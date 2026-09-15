@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f7fb" />
+    <title>Master Teacher Attendance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css?v=2" />
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
+  </head>
+  <body>
+    <div id="toast-region" class="toast-region" aria-live="polite"></div>
+
+    <main id="login-screen" class="login-screen">
+      <section class="login-visual">
+        <div class="visual-brand"><span class="brand-mark brand-mark-light">MT</span><span>master teacher<br><em>attendance</em></span></div>
+        <div class="visual-copy">
+          <p class="eyebrow light">PRESENSI LEBIH TERUKUR</p>
+          <h1>Hadir di tempat yang tepat,<br><span>tepat pada waktunya.</span></h1>
+          <p class="visual-description">Satu alur ringkas untuk mencatat kehadiran Master Teacher dengan QR Code, GPS, dan waktu server.</p>
+        </div>
+        <div class="visual-orbit orbit-one"></div>
+        <div class="visual-orbit orbit-two"></div>
+        <div class="visual-grid"></div>
+        <div class="visual-footer"><span class="signal-dot"></span> Sistem aktif &nbsp;·&nbsp; Pilot 1 cabang</div>
+      </section>
+      <section class="login-panel">
+        <div class="login-panel-inner">
+          <div class="mobile-brand"><span class="brand-mark">MT</span><span>master teacher<br><em>attendance</em></span></div>
+          <div class="login-heading">
+            <p class="eyebrow">SELAMAT DATANG</p>
+            <h2>Masuk ke akun Anda</h2>
+            <p>Gunakan ID dan PIN yang terdaftar untuk melanjutkan.</p>
+          </div>
+          <div class="role-switch" role="tablist" aria-label="Pilih tipe akun">
+            <button class="role-option active" data-login-role="teacher" type="button">Master Teacher</button>
+            <button class="role-option" data-login-role="admin" type="button">Admin</button>
+          </div>
+          <form id="login-form" class="form-stack">
+            <label class="field-label" for="login-id">ID Master Teacher</label>
+            <div class="input-wrap"><span class="input-icon">ID</span><input id="login-id" name="id" autocomplete="username" placeholder="Contoh: MT001" required /></div>
+            <label class="field-label" for="login-pin">PIN / Password</label>
+            <div class="input-wrap"><span class="input-icon">••</span><input id="login-pin" type="password" name="pin" autocomplete="current-password" placeholder="Masukkan PIN" required /><button class="password-toggle" type="button" aria-label="Tampilkan PIN">Lihat</button></div>
+            <div id="login-error" class="form-error" hidden></div>
+            <button class="primary-button login-button" type="submit"><span>Masuk ke dashboard</span><span class="button-arrow">↗</span></button>
+          </form>
+          <div class="login-hint"><span class="hint-icon">i</span><span>Gunakan <strong>MT001 / 1234</strong> untuk Master Teacher demo, atau <strong>admin / admin123</strong> sebagai Admin.</span></div>
+          <p class="privacy-note">Lokasi hanya digunakan saat proses absensi dan tidak ada selfie pada versi pilot.</p>
+        </div>
+      </section>
+    </main>
+
+    <div id="app-shell" class="app-shell" hidden>
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand"><span class="brand-mark">MT</span><div>master teacher<br><em>attendance</em></div></div>
+        <div class="pilot-chip"><span class="signal-dot"></span><span>PILOT AKTIF</span><b id="sidebar-branch-chip">1 cabang</b></div>
+        <nav id="sidebar-nav" class="sidebar-nav"></nav>
+        <div class="sidebar-bottom">
+          <div class="sidebar-help"><span class="help-icon">?</span><div><strong>Butuh bantuan?</strong><small>Hubungi admin operasional</small></div></div>
+          <button id="logout-button" class="logout-button"><span>↪</span> Keluar dari akun</button>
+        </div>
+      </aside>
+      <div class="main-area">
+        <header class="topbar">
+          <button id="mobile-menu-button" class="icon-button mobile-menu-button" aria-label="Buka menu">☰</button>
+          <div class="breadcrumb"><span id="breadcrumb-section">Beranda</span><span class="breadcrumb-slash">/</span><strong id="breadcrumb-page">Ringkasan</strong></div>
+          <div class="topbar-actions">
+            <div class="server-clock"><span class="server-pulse"></span><span>Waktu server</span><strong id="server-clock-value">--:--:--</strong></div>
+            <button class="icon-button notification-button" aria-label="Notifikasi"><span>♧</span><i id="notification-count" hidden>0</i></button>
+            <div class="user-menu"><div class="avatar" id="topbar-avatar">A</div><div class="user-meta"><strong id="topbar-user-name">Admin</strong><span id="topbar-user-role">Admin</span></div><span class="chevron">⌄</span></div>
+          </div>
+        </header>
+        <div id="page-content" class="page-content"></div>
+      </div>
+    </div>
+
+    <div id="modal-root"></div>
+    <script src="/app.js?v=2" defer></script>
+  </body>
+</html>
