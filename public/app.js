@@ -72,6 +72,27 @@ function showToast(message, tone = '') {
 }
 
 async function api(endpoint, options = {}) {
+  if (window.MTA_APPS_SCRIPT && window.google?.script?.run) {
+    const sessionKey = 'mta_apps_session';
+    const sessionToken = sessionStorage.getItem(sessionKey) || '';
+    const requestBody = typeof options.body === 'string' ? (() => { try { return JSON.parse(options.body); } catch { return {}; } })() : (options.body || {});
+    const payload = await new Promise((resolve, reject) => {
+      const runner = window.google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(error => reject(new Error(error?.message || 'Permintaan Apps Script gagal.')));
+      runner.apiRequest(options.method || 'GET', endpoint, requestBody, sessionToken);
+    });
+    if (!payload?.ok) {
+      const err = new Error(payload?.message || 'Permintaan gagal.');
+      err.code = payload?.code;
+      err.details = payload?.details;
+      err.status = payload?.status || 400;
+      throw err;
+    }
+    if (payload.sessionToken) sessionStorage.setItem(sessionKey, payload.sessionToken);
+    if (endpoint === '/api/auth/logout') sessionStorage.removeItem(sessionKey);
+    return payload;
+  }
   const response = await fetch(endpoint, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
   let payload = {};
   try { payload = await response.json(); } catch { payload = { message: 'Respons server tidak valid.' }; }

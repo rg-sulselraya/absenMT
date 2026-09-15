@@ -43,6 +43,26 @@ Endpoint Admin untuk koneksi Google Sheets:
 
 Panel **Pengaturan → Google Sheets → Uji koneksi** menampilkan status tiga tab tanpa mengungkap credential. Apps Script dapat diuji lebih dulu dengan membuka URL Web App di browser; endpoint `doGet` harus mengembalikan pesan bridge aktif.
 
+## Migrasi backend ke Apps Script Web App
+
+Backend Apps Script lengkap tersedia di folder `google-apps-script`. Deploy folder ini sebagai satu project Apps Script dengan file berikut:
+
+- `Code.gs` sebagai backend/API.
+- `Index.html` sebagai frontend aplikasi.
+
+Di **Project Settings → Script properties**, isi:
+
+- `SPREADSHEET_ID` = `10YFzPwSo1Wfm2vwiGvGzAlejIxksUUve6PJfUw1GVis` atau ID spreadsheet yang dipakai.
+- `APP_TIMEZONE` = `Asia/Makassar`.
+- `ACTIVE_BRANCH_ID` = ID cabang pilot, misalnya `MHR`.
+- `MTA_API_TOKEN` = opsional untuk bridge Node lama.
+
+Deploy sebagai **Web app**, pilih **Execute as: Me**, dan berikan akses sesuai kebijakan organisasi. Buka URL `/exec` tanpa parameter; jika deployment benar, halaman login aplikasi akan tampil. Frontend Apps Script menggunakan `google.script.run`, sehingga session tidak bergantung pada cookie server Node dan PIN tidak disimpan di browser.
+
+Sebelum login pertama, jalankan fungsi `setAdminPin_('PIN_ADMIN_6_DIGIT', 'admin')` dari editor Apps Script. Contoh tersebut adalah format saja—ganti dengan PIN milik Anda dan jangan menaruh PIN asli di repository. Setelah login Admin, buka menu **Master Teacher** lalu gunakan **Buat PIN** untuk setiap MT yang ada di tab Google Sheet. Nama fungsi berakhiran `_` agar tidak dapat dipanggil langsung oleh browser.
+
+URL GitHub Pages hanya berfungsi sebagai hosting frontend statis. Untuk alur penuh tanpa Node, gunakan URL Apps Script Web App sebagai URL aplikasi utama. Workflow `.github/workflows/pages.yml` menerbitkan folder `public/` ke GitHub Pages, tetapi API lintas-domain GitHub Pages ke Apps Script bergantung pada kebijakan CORS; deployment Apps Script dengan `Index.html` adalah jalur yang direkomendasikan.
+
 ## Tahap source of truth Master Teacher dan Cabang
 
 Menu **Master Teacher** membaca tab `Master Teacher` melalui `GET /api/master-teachers`, sedangkan menu **Cabang** membaca tab `Branches` melalui `GET /api/branches?source=google`. Jika pembacaan gagal, menu menampilkan error dan tidak diam-diam beralih ke `data/store.json`. Authentication/PIN, Dashboard, Attendance, History, dan proses scan tetap memakai backend/cache lokal pada tahap ini sesuai scope migrasi.
