@@ -10,7 +10,11 @@ var SESSION_TTL = 21600;
 function doGet(e) {
   try {
     var p = (e && e.parameter) || {};
-    if (p.path) return jsonOutput(route('GET', p.path, p, {}));
+    if (p.path) {
+      var method = String(p.method || 'GET').toUpperCase() === 'POST' ? 'POST' : 'GET';
+      var input = p.body ? JSON.parse(p.body) : {};
+      return jsonOutput(route(method, p.path, p, input));
+    }
     if (p.action) return bridge_(parseBridgeGet(p));
     return HtmlService.createHtmlOutputFromFile('Index').setTitle('Master Teacher Attendance');
   } catch (error) { return jsonOutput({ ok: false, success: false, code: 'SERVER_ERROR', message: safeError(error) }); }

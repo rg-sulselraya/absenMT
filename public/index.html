@@ -79,6 +79,11 @@
     </div>
 
     <div id="modal-root"></div>
+    <script>
+      if (location.hostname === 'rg-sulselraya.github.io' || location.hostname.endsWith('.github.io')) {
+        window.MTA_API_BASE = 'https://script.google.com/macros/s/AKfycbwWsvurkCnkjrzBeQbJiaQ4CXWwteW3u8OooHfFB2Ro-N47lAXzEGc-XiIs8RkMh03H/exec';
+      }
+    </script>
     <script src="app.js?v=3" defer></script>
   </body>
 </html>

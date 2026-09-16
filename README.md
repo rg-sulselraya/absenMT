@@ -61,7 +61,9 @@ Deploy sebagai **Web app**, pilih **Execute as: Me**, dan berikan akses sesuai k
 
 Sebelum login pertama, jalankan fungsi `setAdminPin_('PIN_ADMIN_6_DIGIT', 'admin')` dari editor Apps Script. Contoh tersebut adalah format saja—ganti dengan PIN milik Anda dan jangan menaruh PIN asli di repository. Setelah login Admin, buka menu **Master Teacher** lalu gunakan **Buat PIN** untuk setiap MT yang ada di tab Google Sheet. Nama fungsi berakhiran `_` agar tidak dapat dipanggil langsung oleh browser.
 
-URL GitHub Pages hanya berfungsi sebagai hosting frontend statis. Untuk alur penuh tanpa Node, gunakan URL Apps Script Web App sebagai URL aplikasi utama. Workflow `.github/workflows/pages.yml` menerbitkan folder `public/` ke GitHub Pages, tetapi API lintas-domain GitHub Pages ke Apps Script bergantung pada kebijakan CORS; deployment Apps Script dengan `Index.html` adalah jalur yang direkomendasikan.
+GitHub Pages dapat digunakan sebagai URL aplikasi utama. Frontend otomatis memakai Apps Script Web App sebagai API ketika dibuka dari domain `*.github.io`; localhost tetap memakai backend Node lokal. Workflow `.github/workflows/pages.yml` menerbitkan folder `public/` ke GitHub Pages. Pastikan deployment Apps Script dapat diakses oleh pengguna dan jangan menaruh credential di frontend.
+
+Untuk GitHub Pages, setelah memperbarui `Code.gs`, deploy versi Apps Script terbaru. Bridge GET menerima `path`, serta `method=POST` dan `body` ter-encode untuk operasi login, PIN, device, dan scan karena Web App Apps Script mengalihkan POST biasa.
 
 ## Tahap source of truth Master Teacher dan Cabang
 

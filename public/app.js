@@ -93,6 +93,30 @@ async function api(endpoint, options = {}) {
     if (endpoint === '/api/auth/logout') sessionStorage.removeItem(sessionKey);
     return payload;
   }
+  if (window.MTA_API_BASE) {
+    const sessionKey = 'mta_apps_session';
+    const sessionToken = sessionStorage.getItem(sessionKey) || '';
+    const method = String(options.method || 'GET').toUpperCase();
+    const requestBody = typeof options.body === 'string' ? options.body : JSON.stringify(options.body || {});
+    const separator = window.MTA_API_BASE.includes('?') ? '&' : '?';
+    // Apps Script Web Apps redirect POST requests. Use a GET bridge for
+    // cross-origin GitHub Pages calls so the browser keeps the request body.
+    const mutation = method === 'GET' ? '' : `&method=${encodeURIComponent(method)}&body=${encodeURIComponent(requestBody)}`;
+    const url = `${window.MTA_API_BASE}${separator}path=${encodeURIComponent(endpoint)}&session=${encodeURIComponent(sessionToken)}${mutation}`;
+    const response = await fetch(url, { headers: { Accept: 'application/json', ...(options.headers || {}) } });
+    let payload = {};
+    try { payload = await response.json(); } catch { payload = { message: 'Respons Apps Script tidak valid.' }; }
+    if (!response.ok || !payload?.ok) {
+      const err = new Error(payload.message || 'Permintaan gagal.');
+      err.code = payload.code;
+      err.details = payload.details;
+      err.status = payload.status || response.status;
+      throw err;
+    }
+    if (payload.sessionToken) sessionStorage.setItem(sessionKey, payload.sessionToken);
+    if (endpoint === '/api/auth/logout') sessionStorage.removeItem(sessionKey);
+    return payload;
+  }
   const response = await fetch(endpoint, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
   let payload = {};
   try { payload = await response.json(); } catch { payload = { message: 'Respons server tidak valid.' }; }
