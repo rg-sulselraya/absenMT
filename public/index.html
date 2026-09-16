@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=3" />
+    <link rel="stylesheet" href="styles.css?v=8" onerror="this.onerror=null;this.href='public/styles.css?v=8'" />
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
   </head>
@@ -84,6 +84,19 @@
         window.MTA_API_BASE = 'https://script.google.com/macros/s/AKfycbwWsvurkCnkjrzBeQbJiaQ4CXWwteW3u8OooHfFB2Ro-N47lAXzEGc-XiIs8RkMh03H/exec';
       }
     </script>
-    <script src="app.js?v=3" defer></script>
+    <script>
+      (() => {
+        const candidates = ['app.js?v=8', 'public/app.js?v=8'];
+        const load = index => {
+          if (index >= candidates.length) return;
+          const script = document.createElement('script');
+          script.src = candidates[index];
+          script.async = false;
+          script.onerror = () => { script.remove(); load(index + 1); };
+          document.body.appendChild(script);
+        };
+        load(0);
+      })();
+    </script>
   </body>
 </html>
