@@ -275,8 +275,10 @@ function renderActivity(logs = []) {
 
 function renderScanner() {
   const branchHint = state.branches.filter(branch => branch.active).map(branch => branch.id).join(', ') || 'CAB-HRT';
-  $('#page-content').innerHTML = `${pageHeading('Scan QR Absensi', 'Ikuti tiga langkah untuk mencatat kehadiran dengan lokasi yang terverifikasi.')}${deviceBanner()}<div class="scanner-layout"><section class="card scanner-card"><div id="scanner-stage" class="scanner-stage"><video id="scanner-video" playsinline muted></video><div class="scanner-placeholder"><div><div class="camera-icon"></div><strong>Siap memindai QR Code</strong><span>Izinkan akses kamera, lalu arahkan ke QR cabang.</span></div></div><div class="scanner-frame"><div class="scanner-line"></div></div></div><div class="scanner-actions"><button class="primary-button" id="start-camera-button"><span>⌾</span> Aktifkan kamera</button><button class="secondary-button" id="stop-camera-button" type="button">Hentikan kamera</button></div><p class="scanner-note" id="scanner-note">Kamera menggunakan QR statis cabang. Jika kamera tidak tersedia, masukkan payload secara manual di bawah.</p><div class="manual-scan"><input id="manual-qr" placeholder="Payload QR, contoh CAB-HRT" autocomplete="off"/><button id="manual-qr-button" title="Lanjutkan">→</button></div></section><aside class="card scan-steps"><h3>Alur absensi</h3><div class="step"><span class="step-number">1</span><div><strong>Scan QR cabang</strong><span>QR memuat identifier unik cabang, bukan koordinat.</span></div></div><div class="step"><span class="step-number">2</span><div><strong>Ambil lokasi GPS</strong><span>Lokasi hanya diminta ketika scan dilakukan.</span></div></div><div class="step"><span class="step-number">3</span><div><strong>Catat waktu server</strong><span>Jarak dihitung ulang secara aman di backend.</span></div></div><div class="attention-card" style="margin-top:2px"><div class="attention-icon">i</div><div><h4>Cabang aktif</h4><p>${escapeHtml(branchHint)} · Setelah QR terbaca, GPS akan diminta otomatis.</p></div></div></aside></div>`;
+  $('#page-content').innerHTML = `${pageHeading('Scan QR Absensi', 'Ikuti tiga langkah untuk mencatat kehadiran dengan lokasi yang terverifikasi.')}${deviceBanner()}<div class="scanner-layout"><section class="card scanner-card"><div id="scanner-stage" class="scanner-stage"><video id="scanner-video" playsinline muted></video><div class="scanner-placeholder"><div><div class="camera-icon"></div><strong>Siap memindai QR Code</strong><span>Izinkan akses kamera, lalu arahkan ke QR cabang.</span></div></div><div class="scanner-frame"><div class="scanner-line"></div></div></div><div class="scanner-actions"><button class="primary-button" id="start-camera-button"><span>⌾</span> Aktifkan kamera</button><button class="secondary-button" id="photo-qr-button" type="button">Ambil foto QR</button><button class="secondary-button" id="stop-camera-button" type="button">Hentikan kamera</button><input id="qr-image-input" type="file" accept="image/*" capture="environment" hidden></div><p class="scanner-note" id="scanner-note">Jika izin kamera ditolak, gunakan “Ambil foto QR” untuk memotret QR dengan kamera HP.</p><div class="manual-scan"><input id="manual-qr" placeholder="Payload QR, contoh CAB-HRT" autocomplete="off"/><button id="manual-qr-button" title="Lanjutkan">→</button></div></section><aside class="card scan-steps"><h3>Alur absensi</h3><div class="step"><span class="step-number">1</span><div><strong>Scan QR cabang</strong><span>QR memuat identifier unik cabang, bukan koordinat.</span></div></div><div class="step"><span class="step-number">2</span><div><strong>Ambil lokasi GPS</strong><span>Lokasi hanya diminta ketika scan dilakukan.</span></div></div><div class="step"><span class="step-number">3</span><div><strong>Catat waktu server</strong><span>Jarak dihitung ulang secara aman di backend.</span></div></div><div class="attention-card" style="margin-top:2px"><div class="attention-icon">i</div><div><h4>Cabang aktif</h4><p>${escapeHtml(branchHint)} · Setelah QR terbaca, GPS akan diminta otomatis.</p></div></div></aside></div>`;
   $('#start-camera-button').addEventListener('click', startCamera);
+  $('#photo-qr-button').addEventListener('click', () => $('#qr-image-input').click());
+  $('#qr-image-input').addEventListener('change', scanQrImage);
   $('#stop-camera-button').addEventListener('click', stopCamera);
   $('#manual-qr-button').addEventListener('click', () => processQr($('#manual-qr').value));
   $('#manual-qr').addEventListener('keydown', event => { if (event.key === 'Enter') processQr(event.currentTarget.value); });
@@ -306,9 +308,41 @@ async function startCamera() {
     note.textContent = 'Arahkan kamera ke QR Code cabang. Pemindaian akan berjalan otomatis.';
     scanVideoFrame();
   } catch (err) {
-    note.textContent = err.name === 'NotAllowedError' ? 'Izin kamera ditolak. Izinkan kamera di pengaturan browser lalu coba lagi.' : `Kamera tidak dapat diaktifkan: ${err.message}`;
+    note.textContent = err.name === 'NotAllowedError' ? 'Izin kamera ditolak. Izinkan kamera di pengaturan browser atau gunakan “Ambil foto QR”.' : `Kamera tidak dapat diaktifkan: ${err.message}`;
     showToast(note.textContent, 'error');
   }
+}
+
+function scanQrImage(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  const note = $('#scanner-note');
+  if (typeof window.jsQR !== 'function') {
+    const message = 'Pemindai foto belum tersedia. Gunakan input payload QR manual.';
+    if (note) note.textContent = message;
+    return showToast(message, 'error');
+  }
+  const image = new Image();
+  const objectUrl = URL.createObjectURL(file);
+  image.onload = () => {
+    const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const code = window.jsQR(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height, { inversionAttempts: 'attemptBoth' });
+    URL.revokeObjectURL(objectUrl);
+    if (!code?.data) {
+      const message = 'QR tidak terbaca dari foto. Pastikan seluruh QR terlihat jelas, lalu coba lagi.';
+      if (note) note.textContent = message;
+      return showToast(message, 'error');
+    }
+    processQr(code.data);
+  };
+  image.onerror = () => { URL.revokeObjectURL(objectUrl); showToast('Foto QR tidak dapat dibaca.', 'error'); };
+  image.src = objectUrl;
 }
 
 function scanVideoFrame() {

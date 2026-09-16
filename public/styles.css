@@ -445,6 +445,8 @@ button { cursor: pointer; }
   .qr-payload { font-size: 13px; }
   .scanner-placeholder strong { font-size: 15px; }
   .scanner-placeholder span, .scanner-note { font-size: 13px; }
+  .scanner-actions { flex-wrap: wrap; }
+  .scanner-actions .primary-button, .scanner-actions .secondary-button { flex: 1 1 145px; }
   .secondary-button { min-height: 46px; font-size: 13px; }
   .manual-scan input { height: 46px; font-size: 14px; }
   .manual-scan button { width: 48px; }
