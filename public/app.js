@@ -423,7 +423,7 @@ function stopCamera() {
 async function processQr(value) {
   const payload = String(value || '').trim().toUpperCase();
   if (!payload) return showToast('QR belum terbaca. Arahkan kamera atau isi payload manual.', 'error');
-  const branch = state.branches.find(item => item.active && (item.id === payload || item.qrPayload === payload));
+  const branch = state.branches.find(item => item.active && (String(item.id || '').trim().toUpperCase() === payload || String(item.qrPayload || '').trim().toUpperCase() === payload));
   if (!branch) return showToast('QR tidak valid atau cabang tidak aktif. Minta scan ulang.', 'error');
   stopCamera();
   const note = $('#scanner-note');
