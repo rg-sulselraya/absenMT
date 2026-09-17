@@ -9,8 +9,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css?v=8" onerror="this.onerror=null;this.href='public/styles.css?v=8'" />
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
+    <script src="qrcode.min.js?v=1" defer></script>
+    <!-- Keep QR scanning available on mobile even when a CDN is blocked. -->
+    <script src="jsQR.js?v=1" defer></script>
   </head>
   <body>
     <div id="toast-region" class="toast-region" aria-live="polite"></div>
@@ -86,7 +87,7 @@
     </script>
     <script>
       (() => {
-        const candidates = ['app.js?v=8', 'public/app.js?v=8'];
+        const candidates = ['app.js?v=9', 'public/app.js?v=9'];
         const load = index => {
           if (index >= candidates.length) return;
           const script = document.createElement('script');

@@ -12,7 +12,7 @@ const state = {
   devices: [],
   sheetsTest: null,
   lastResult: null,
-  scanner: { stream: null, raf: null, detector: null, detecting: false },
+  scanner: { stream: null, raf: null, detector: null, detecting: false, canvas: null, context: null, lastDecodeAt: 0 },
   serverTime: null,
   serverTimeReceivedAt: null,
 };
@@ -325,11 +325,13 @@ async function startCamera() {
     if ('BarcodeDetector' in window) {
       try { state.scanner.detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch { state.scanner.detector = null; }
     }
-    if (!state.scanner.detector) {
-      note.textContent = 'Preview kamera aktif. Browser ini belum mendukung pembacaan QR otomatis; gunakan input payload manual di bawah.';
+    if (!state.scanner.detector && typeof window.jsQR !== 'function') {
+      note.textContent = 'Preview kamera aktif, tetapi library pembaca QR belum tersedia. Gunakan “Ambil foto QR” atau input payload manual.';
       return;
     }
-    note.textContent = 'Arahkan kamera ke QR Code cabang. Pemindaian akan berjalan otomatis.';
+    note.textContent = state.scanner.detector
+      ? 'Arahkan kamera ke QR Code cabang. Pemindaian akan berjalan otomatis.'
+      : 'Arahkan kamera ke QR Code cabang. Pemindaian QR kompatibel sedang berjalan.';
     scanVideoFrame();
   } catch (err) {
     note.textContent = err.name === 'NotAllowedError' ? 'Izin kamera ditolak. Izinkan kamera di pengaturan browser atau gunakan “Ambil foto QR”.' : `Kamera tidak dapat diaktifkan: ${err.message}`;
@@ -370,16 +372,37 @@ function scanQrImage(event) {
 }
 
 function scanVideoFrame() {
-  if (!state.scanner.stream || !state.scanner.detector || state.page !== 'scan') return;
+  if (!state.scanner.stream || state.page !== 'scan') return;
   state.scanner.raf = requestAnimationFrame(async () => {
     const video = $('#scanner-video');
     if (video && video.readyState >= 2 && !state.scanner.detecting) {
       state.scanner.detecting = true;
+      let decoded = '';
       try {
-        const codes = await state.scanner.detector.detect(video);
-        if (codes?.[0]?.rawValue) return processQr(codes[0].rawValue);
+        if (state.scanner.detector) {
+          const codes = await state.scanner.detector.detect(video);
+          decoded = codes?.[0]?.rawValue || '';
+        } else if (typeof window.jsQR === 'function' && performance.now() - state.scanner.lastDecodeAt >= 180) {
+          state.scanner.lastDecodeAt = performance.now();
+          const sourceWidth = video.videoWidth;
+          const sourceHeight = video.videoHeight;
+          if (sourceWidth && sourceHeight) {
+            const scale = Math.min(1, 1280 / sourceWidth);
+            const width = Math.max(1, Math.round(sourceWidth * scale));
+            const height = Math.max(1, Math.round(sourceHeight * scale));
+            if (!state.scanner.canvas) state.scanner.canvas = document.createElement('canvas');
+            if (state.scanner.canvas.width !== width || state.scanner.canvas.height !== height) {
+              state.scanner.canvas.width = width;
+              state.scanner.canvas.height = height;
+              state.scanner.context = state.scanner.canvas.getContext('2d', { willReadFrequently: true });
+            }
+            state.scanner.context.drawImage(video, 0, 0, width, height);
+            decoded = window.jsQR(state.scanner.context.getImageData(0, 0, width, height).data, width, height, { inversionAttempts: 'attemptBoth' })?.data || '';
+          }
+        }
       } catch { /* Kamera masih mencari frame QR berikutnya. */ }
       state.scanner.detecting = false;
+      if (decoded) return processQr(decoded);
     }
     scanVideoFrame();
   });
@@ -389,6 +412,7 @@ function stopCamera() {
   if (state.scanner.raf) cancelAnimationFrame(state.scanner.raf);
   state.scanner.raf = null;
   state.scanner.detecting = false;
+  state.scanner.lastDecodeAt = 0;
   if (state.scanner.stream) state.scanner.stream.getTracks().forEach(track => track.stop());
   state.scanner.stream = null;
   const video = $('#scanner-video');
