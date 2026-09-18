@@ -12,7 +12,7 @@ const state = {
   devices: [],
   sheetsTest: null,
   lastResult: null,
-  scanner: { stream: null, raf: null, detector: null, detecting: false, canvas: null, context: null, lastDecodeAt: 0 },
+  scanner: { stream: null, raf: null, detector: null, detecting: false, processing: false, canvas: null, context: null, lastDecodeAt: 0 },
   serverTime: null,
   serverTimeReceivedAt: null,
 };
@@ -218,8 +218,11 @@ async function loadBaseData() {
   try {
     const config = await api('/api/config');
     state.config = config;
-    const branchPayload = await api('/api/branches');
-    state.branches = branchPayload.branches || [];
+    state.branches = config.branches || [];
+    if (!state.branches.length) {
+      const branchPayload = await api('/api/branches');
+      state.branches = branchPayload.branches || [];
+    }
     $('#sidebar-branch-chip').textContent = `${state.branches.filter(branch => branch.active).length} cabang`;
     updateServerClock(config.serverTime);
   } catch (err) {
@@ -412,6 +415,7 @@ function stopCamera() {
   if (state.scanner.raf) cancelAnimationFrame(state.scanner.raf);
   state.scanner.raf = null;
   state.scanner.detecting = false;
+  state.scanner.processing = false;
   state.scanner.lastDecodeAt = 0;
   if (state.scanner.stream) state.scanner.stream.getTracks().forEach(track => track.stop());
   state.scanner.stream = null;
@@ -421,16 +425,22 @@ function stopCamera() {
 }
 
 async function processQr(value) {
+  if (state.scanner.processing) return;
   const payload = String(value || '').trim().toUpperCase();
   if (!payload) return showToast('QR belum terbaca. Arahkan kamera atau isi payload manual.', 'error');
   const branch = state.branches.find(item => item.active && (String(item.id || '').trim().toUpperCase() === payload || String(item.qrPayload || '').trim().toUpperCase() === payload));
   if (!branch) return showToast('QR tidak valid atau cabang tidak aktif. Minta scan ulang.', 'error');
   stopCamera();
+  state.scanner.processing = true;
   const note = $('#scanner-note');
-  if (note) note.textContent = `QR ${payload} terbaca. Meminta lokasi GPS…`;
-  if (!navigator.geolocation) return showToast('GPS tidak tersedia di perangkat ini. Absensi tidak disimpan.', 'error');
+  if (note) note.textContent = `QR ${payload} terbaca. Menentukan lokasi…`;
+  if (!navigator.geolocation) {
+    state.scanner.processing = false;
+    return showToast('GPS tidak tersedia di perangkat ini. Absensi tidak disimpan.', 'error');
+  }
   try {
     const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
+    if (note) note.textContent = 'Lokasi ditemukan. Menyimpan absensi…';
     const result = await api('/api/attendance/scan', { method: 'POST', body: JSON.stringify({ branchId: payload, latitude: position.coords.latitude, longitude: position.coords.longitude }) });
     state.lastResult = result;
     if (result.complete) showToast(result.message, 'success');
@@ -439,6 +449,8 @@ async function processQr(value) {
     const messages = { GPS_INVALID: 'GPS tidak tersedia atau koordinat tidak valid. Aktifkan lokasi lalu coba lagi.', DEVICE_PENDING: 'Perangkat belum diotorisasi Admin.', BRANCH_COORDINATES_MISSING: 'Koordinat cabang belum dikonfigurasi Admin.', RATE_LIMITED: err.message };
     showToast(messages[err.code] || err.message, 'error');
     if (note) note.textContent = messages[err.code] || err.message;
+  } finally {
+    state.scanner.processing = false;
   }
 }
 
@@ -562,6 +574,8 @@ async function saveBranch(event) {
 async function renderSettings() {
   const payload = await api('/api/devices').catch(err => { showToast(err.message, 'error'); return { devices: [] }; });
   state.devices = payload.devices || [];
+  const canRefreshAppsScriptCache = Boolean(window.MTA_APPS_SCRIPT || window.MTA_API_BASE);
+  const refreshCacheButton = canRefreshAppsScriptCache ? '<button class="tiny-button" data-action="refresh-master-cache">Refresh data</button>' : '';
   const pending = state.devices.filter(device => device.status === 'pending').length;
   const sheets = state.config?.sheetsEnabled;
   const sheetsTest = state.sheetsTest;
@@ -578,7 +592,7 @@ async function renderSettings() {
         ${state.devices.length ? state.devices.map(device => `<div class="setting-row"><div><strong>${escapeHtml(device.teacherName)} · ${escapeHtml(device.mtId)}</strong><small>${escapeHtml(device.id)}<br>Terakhir terlihat: ${escapeHtml(device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString('id-ID') : '—')}</small></div><div class="device-actions">${device.status === 'pending' ? `<button class="tiny-button approve" data-device-action="authorize" data-device-id="${escapeHtml(device.id)}">Otorisasi</button>` : `<span class="setting-value">${device.status === 'approved' ? 'Disetujui' : 'Diblokir'}</span>`}${device.status !== 'pending' ? `<button class="tiny-button" data-device-action="reset" data-device-id="${escapeHtml(device.id)}">Reset</button>` : ''}${device.status !== 'blocked' ? `<button class="tiny-button danger" data-device-action="revoke" data-device-id="${escapeHtml(device.id)}">Cabut</button>` : ''}</div></div>`).join('') : `<div class="empty-state"><strong>Belum ada perangkat</strong><span>Device baru akan muncul setelah Master Teacher login.</span></div>`}
       </section>
       <section class="card settings-card">
-        <div class="card-header" style="padding:0 0 15px;margin-bottom:17px"><div><h3>Google Sheets</h3><p>Read/write dijalankan di backend melalui Google Apps Script.</p></div><button class="tiny-button approve" data-action="test-sheets">Uji koneksi</button></div>
+        <div class="card-header" style="padding:0 0 15px;margin-bottom:17px"><div><h3>Google Sheets</h3><p>Read/write dijalankan di backend melalui Google Apps Script.</p></div><div class="device-actions">${refreshCacheButton}<button class="tiny-button approve" data-action="test-sheets">Uji koneksi</button></div></div>
         <div class="setting-row"><div><strong>Spreadsheet: Master Teacher Attendance</strong><small>${sheetsTest?.success ? `Terakhir diuji ${sheetsTest.elapsedMs} ms.` : 'Credential tidak pernah dikirim ke browser.'}</small></div><span class="setting-value ${testTone}">${testStatus}</span></div>
         ${sheetRows || `<div class="setting-row"><div><strong>Master Teacher</strong><small>GET /api/master-teachers · sumber Google Sheets setelah konfigurasi.</small></div><span class="setting-value ${testTone}">${sheetsTest?.success ? 'Connected' : '—'}</span></div><div class="setting-row"><div><strong>Branches</strong><small>GET /api/branches?source=google</small></div><span class="setting-value ${testTone}">${sheetsTest?.success ? 'Connected' : '—'}</span></div><div class="setting-row"><div><strong>Attendance</strong><small>GET /api/attendance?source=google · append backend</small></div><span class="setting-value ${testTone}">${sheetsTest?.success ? 'Connected' : '—'}</span></div>`}
         ${sheetsTest && !sheetsTest.success ? `<div class="device-banner pending" style="margin-top:15px;margin-bottom:0"><span class="banner-icon">⚠</span><div><strong>Google Sheets belum terhubung</strong><span>${escapeHtml(sheetsTest.message)}</span></div></div>` : ''}
@@ -603,6 +617,7 @@ function bindContentEvents() {
   $$('#page-content [data-action="print-qr"]').forEach(button => button.addEventListener('click', () => window.print()));
   $$('#page-content [data-device-action]').forEach(button => button.addEventListener('click', () => updateDevice(button.dataset.deviceId, button.dataset.deviceAction)));
   $$('#page-content [data-action="test-sheets"]').forEach(button => button.addEventListener('click', testSheetsConnection));
+  $$('#page-content [data-action="refresh-master-cache"]').forEach(button => button.addEventListener('click', refreshMasterDataCache));
 }
 
 function openModal(content) {
@@ -672,6 +687,20 @@ async function testSheetsConnection() {
     showToast(err.message, 'error');
   }
   await renderSettings();
+}
+
+async function refreshMasterDataCache() {
+  const buttons = $$('#page-content [data-action="refresh-master-cache"]');
+  buttons.forEach(button => { button.disabled = true; button.textContent = 'Memuat…'; });
+  try {
+    const result = await api('/api/cache/refresh', { method: 'POST' });
+    showToast(`${result.message} ${result.teachers} MT · ${result.branches} cabang.`, 'success');
+    await loadBaseData();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    await renderSettings();
+  }
 }
 
 async function logout() {
