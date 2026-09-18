@@ -696,4 +696,7 @@ function init() {
   api('/api/me').then(async payload => { state.user = payload.user; state.device = payload.device; await enterApp(); }).catch(() => {});
 }
 
-document.addEventListener('DOMContentLoaded', init);
+// app.js is loaded dynamically by index.html. When the network is fast,
+// DOMContentLoaded may already have fired before this file arrives.
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();

@@ -73,7 +73,8 @@ function login(input) {
   if (role === 'admin') {
     var adminId = getProperty('MTA_ADMIN_ID') || 'admin';
     var adminHash = getProperty('MTA_ADMIN_PIN_HASH');
-    if (!sameId(id, adminId) || !adminHash || !verifySecret(pin, adminHash)) return apiError('ID atau PIN tidak cocok.', 'INVALID_CREDENTIALS', 401);
+    if (!adminHash) return apiError('Login Admin belum dikonfigurasi.', 'ADMIN_NOT_CONFIGURED', 503);
+    if (!sameId(id, adminId) || !verifySecret(pin, adminHash)) return apiError('ID atau PIN tidak cocok.', 'INVALID_CREDENTIALS', 401);
     var admin = createSession_({ userId: adminId, name: 'Admin', role: 'admin', branchId: null, deviceId: null });
     return success({ user: safeUser(admin), device: null, sessionToken: admin.token, serverTime: nowIso() });
   }

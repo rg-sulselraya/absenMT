@@ -630,6 +630,7 @@ async function handleApi(req, res, pathname, query) {
     let account;
     if (role === 'admin') {
       account = store.admins.find(item => item.id.toUpperCase() === identifier);
+      if (!store.admins.some(item => item.status === 'active' && item.pinHash)) return error(res, 503, 'Login Admin belum dikonfigurasi.', 'ADMIN_NOT_CONFIGURED');
       if (!account || account.status !== 'active' || !verifyPin(pin, account.pinHash)) return error(res, 401, 'ID atau PIN tidak cocok.', 'INVALID_CREDENTIALS');
     } else {
       let sheetTeachers;
