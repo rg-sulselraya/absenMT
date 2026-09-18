@@ -4,6 +4,8 @@ data/store.json
 data/*.json
 service-account*.json
 google-apps-script-token*.txt
+.clasp.json
+.clasprc.json
 node_modules/
 work/
 outputs/

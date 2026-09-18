@@ -1,0 +1,56 @@
+name: Deploy Google Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'google-apps-script/**'
+      - '.github/workflows/apps-script.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apps-script-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install clasp
+        run: npm install --global @google/clasp@2.4.2
+
+      - name: Configure clasp credentials
+        env:
+          CLASP_RC_JSON: ${{ secrets.CLASP_RC_JSON }}
+          APPS_SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLASP_RC_JSON" || { echo 'GitHub Secret CLASP_RC_JSON belum diatur.' >&2; exit 1; }
+          test -n "$APPS_SCRIPT_ID" || { echo 'GitHub Secret APPS_SCRIPT_ID belum diatur.' >&2; exit 1; }
+          printf '%s' "$CLASP_RC_JSON" > "$HOME/.clasprc.json"
+          node -e "const fs=require('fs'); fs.writeFileSync('google-apps-script/.clasp.json', JSON.stringify({scriptId: process.env.APPS_SCRIPT_ID, rootDir: '.'}, null, 2)+'\\n');"
+
+      - name: Push source to Apps Script
+        working-directory: google-apps-script
+        run: clasp push --force
+
+      - name: Update existing web app deployment
+        working-directory: google-apps-script
+        env:
+          APPS_SCRIPT_DEPLOYMENT_ID: ${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "$APPS_SCRIPT_DEPLOYMENT_ID" || { echo 'GitHub Secret APPS_SCRIPT_DEPLOYMENT_ID belum diatur.' >&2; exit 1; }
+          clasp deploy --deploymentId "$APPS_SCRIPT_DEPLOYMENT_ID" --description "GitHub Actions ${GITHUB_SHA::7}"

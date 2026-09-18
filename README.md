@@ -63,6 +63,29 @@ Sebelum login pertama, jalankan fungsi `setAdminPin_('PIN_ADMIN_6_DIGIT', 'admin
 
 GitHub Pages dapat digunakan sebagai URL aplikasi utama. Frontend otomatis memakai Apps Script Web App sebagai API ketika dibuka dari domain `*.github.io`; localhost tetap memakai backend Node lokal. Workflow `.github/workflows/pages.yml` menerbitkan folder `public/` ke GitHub Pages. Pastikan deployment Apps Script dapat diakses oleh pengguna dan jangan menaruh credential di frontend.
 
+## Deploy Apps Script otomatis dari GitHub Actions
+
+Workflow `.github/workflows/apps-script.yml` otomatis menjalankan `clasp push` dan memperbarui deployment Web App yang sama setiap kali ada perubahan di `google-apps-script/` pada branch `main`. Push ke GitHub tidak mengubah Script Properties seperti `SPREADSHEET_ID`, `APP_TIMEZONE`, atau PIN; konfigurasi tersebut tetap berada di Apps Script.
+
+Konfigurasi satu kali:
+
+1. Aktifkan Google Apps Script API di <https://script.google.com/home/usersettings>.
+2. Di komputer yang sudah memiliki akses ke project Apps Script, jalankan `npm install --global @google/clasp`, lalu `clasp login`.
+3. Salin isi file `~/.clasprc.json` sebagai GitHub Secret bernama `CLASP_RC_JSON`. Jangan commit file ini.
+4. Ambil **Script ID** dari Apps Script → Project Settings → IDs, lalu simpan sebagai Secret `APPS_SCRIPT_ID`.
+5. Ambil **Deployment ID** dari Apps Script → Deploy → Manage deployments pada deployment Web App yang sedang dipakai, lalu simpan sebagai Secret `APPS_SCRIPT_DEPLOYMENT_ID`.
+6. Pastikan deployment Web App sudah dibuat dengan URL `/exec`, lalu push perubahan ke `main` atau jalankan workflow melalui tab **Actions → Deploy Google Apps Script → Run workflow**.
+
+Secret yang diperlukan:
+
+```text
+CLASP_RC_JSON
+APPS_SCRIPT_ID
+APPS_SCRIPT_DEPLOYMENT_ID
+```
+
+Workflow tidak membuat deployment baru setiap kali push; `clasp deploy --deploymentId` membuat versi baru dan memperbarui deployment ID yang sama, sehingga URL `/exec` tetap. Setelah `Code.gs` berhasil dikirim, buka URL Web App dan uji login, cache refresh, serta scan. Jika deployment gagal, periksa log job di GitHub Actions—credential tidak ditampilkan dalam log.
+
 Untuk GitHub Pages, setelah memperbarui `Code.gs`, deploy versi Apps Script terbaru. Bridge GET menerima `path`, serta `method=POST` dan `body` ter-encode untuk operasi login, PIN, device, dan scan karena Web App Apps Script mengalihkan POST biasa.
 
 ## Tahap source of truth Master Teacher dan Cabang
