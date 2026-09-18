@@ -39,7 +39,7 @@ function route(method, rawPath, parameter, input) {
     var session = getSession(params.session || (input && input.session));
     var path = parsed.pathname;
     if (path === '/api/health' && method === 'GET') return success({ app: 'Master Teacher Attendance', serverTime: nowIso() });
-    if (path === '/api/auth/login' && method === 'POST') return login(input || {});
+    if (path === '/api/auth/login' && method === 'POST') { var requestStartedAt = new Date().getTime(); perfLog_('REQUEST_RECEIVED', requestStartedAt); return login(input || {}, requestStartedAt); }
     if (path === '/api/auth/logout' && method === 'POST') { deleteSession_(params.session); return success({}); }
     if (path === '/api/me' && method === 'GET') {
       if (!session) return apiError('Belum login.', 'UNAUTHORIZED', 401);
@@ -69,7 +69,9 @@ function requireAdmin(session, callback) { return session.role === 'admin' ? cal
 function requireTeacher(session, callback) { return session.role === 'teacher' ? callback() : apiError('Khusus Master Teacher.', 'FORBIDDEN', 403); }
 function apiRequest(method, endpoint, input, sessionToken) { var parameter = { session: String(sessionToken || '') }; return route(String(method || 'GET').toUpperCase(), endpoint, parameter, input || {}); }
 
-function login(input) {
+function login(input, requestStartedAt) {
+  var startedAt = requestStartedAt || new Date().getTime();
+  perfLog_('LOGIN_START', startedAt);
   if (!allowAttempt_('login:' + String(input.id || '').trim().toLowerCase(), 15, 60)) return apiError('Terlalu banyak percobaan login. Coba lagi beberapa saat.', 'RATE_LIMITED', 429);
   var role = input.role === 'admin' ? 'admin' : 'teacher';
   var id = String(input.id || '').trim();
@@ -82,11 +84,22 @@ function login(input) {
     var admin = createSession_({ userId: adminId, name: 'Admin', role: 'admin', branchId: null, deviceId: null });
     return success({ user: safeUser(admin), device: null, sessionToken: admin.token, serverTime: nowIso() });
   }
-  var teacher = findById(getMasterTeachers(), id);
+  var readMtStartedAt = new Date().getTime();
+  perfLog_('READ_MT_START', startedAt);
+  var teachers = getMasterTeachers();
+  perfLog_('READ_MT_END', startedAt, { stageMs: new Date().getTime() - readMtStartedAt, count: teachers.length });
+  var validateIdStartedAt = new Date().getTime();
+  perfLog_('VALIDATE_ID_START', startedAt);
+  var teacher = findById(teachers, id);
+  perfLog_('VALIDATE_ID_END', startedAt, { stageMs: new Date().getTime() - validateIdStartedAt, found: Boolean(teacher) });
   if (!teacher) return apiError('Tidak dapat login. ID Master Teacher tidak ditemukan.', 'TEACHER_NOT_FOUND', 401);
   if (teacher.status !== 'active') return apiError('Akun Master Teacher tidak aktif.', 'TEACHER_INACTIVE', 403);
   if (!/^\d{6}$/.test(pin)) return apiError('PIN Master Teacher harus terdiri dari 6 digit.', 'INVALID_PIN_FORMAT', 400);
-  if (!getTeacherPinHash(teacher.id) || !verifySecret(pin, getTeacherPinHash(teacher.id))) return apiError('ID Master Teacher atau PIN salah.', 'INVALID_CREDENTIALS', 401);
+  var pinHash = getTeacherPinHash(teacher.id);
+  var pinStartedAt = new Date().getTime();
+  var pinValid = Boolean(pinHash) && verifySecret(pin, pinHash);
+  perfLog_('PIN_CHECK', startedAt, { stageMs: new Date().getTime() - pinStartedAt, configured: Boolean(pinHash), valid: pinValid });
+  if (!pinValid) return apiError('ID Master Teacher atau PIN salah.', 'INVALID_CREDENTIALS', 401);
   var deviceId = String(input.deviceId || '').trim().slice(0, 120);
   if (!deviceId) return apiError('Perangkat tidak dapat diidentifikasi.', 'DEVICE_REQUIRED', 400);
   var device = findDevice(teacher.id, deviceId);
@@ -94,8 +107,14 @@ function login(input) {
   if (!device) { device = { id: deviceId, mtId: teacher.id, status: 'pending', createdAt: nowIso(), lastSeenAt: nowIso() }; devices.push(device); }
   else device.lastSeenAt = nowIso();
   saveDevices_(devices);
+  var sessionStartedAt = new Date().getTime();
+  perfLog_('SESSION_START', startedAt);
   var user = createSession_({ userId: teacher.id, name: teacher.name, role: 'teacher', branchId: teacher.branchId, deviceId: deviceId });
-  return success({ user: safeUser(user), device: publicDevice(device), sessionToken: user.token, serverTime: nowIso() });
+  perfLog_('SESSION_END', startedAt, { stageMs: new Date().getTime() - sessionStartedAt });
+  var response = success({ user: safeUser(user), device: publicDevice(device), sessionToken: user.token, serverTime: nowIso() });
+  perfLog_('AUTH_END', startedAt);
+  perfLog_('RESPONSE_SENT', startedAt);
+  return response;
 }
 
 function configResponse(session) { var allBranches = getBranches(), branches = session && session.role === 'admin' ? allBranches : allBranches.filter(function(b) { return b.active; }), activeId = getProperty('ACTIVE_BRANCH_ID') || (branches[0] && branches[0].id) || ''; return success({ settings: { activeBranchId: activeId, timezone: getTimezone(), appName: 'Master Teacher Attendance' }, branch: findById(branches, activeId) || branches[0] || null, branches: branches, sheetsEnabled: true, sheetsProvider: 'google-apps-script', spreadsheetIdConfigured: Boolean(getProperty('SPREADSHEET_ID')), serverTime: nowIso() }); }
@@ -156,6 +175,7 @@ function sortNewest(a, b) { return new Date(b.timestamp || b.createdAt).getTime(
 
 function getProperty(k) { return PropertiesService.getScriptProperties().getProperty(k) || ''; }
 function setProperty_(k, v) { PropertiesService.getScriptProperties().setProperty(k, String(v)); }
+function perfLog_(label, startedAt, details) { if (getProperty('MTA_PERF_LOGGING') === 'false') return; var entry = Object.assign({ marker: 'MTA_PERF', label: label, elapsedMs: new Date().getTime() - Number(startedAt || new Date().getTime()), at: new Date().toISOString() }, details || {}); try { console.log(JSON.stringify(entry)); } catch (e) { Logger.log(JSON.stringify(entry)); } }
 function getCachedJson_(key) { var raw = CacheService.getScriptCache().get(key); if (!raw) return null; try { return JSON.parse(raw); } catch (e) { CacheService.getScriptCache().remove(key); return null; } }
 function putCachedJson_(key, value) { var raw = JSON.stringify(value); if (raw.length < 95000) CacheService.getScriptCache().put(key, raw, MASTER_DATA_CACHE_TTL); }
 function refreshMasterDataCache_() { var cache = CacheService.getScriptCache(); cache.removeAll([MASTER_TEACHERS_CACHE_KEY, BRANCHES_CACHE_KEY]); var teachers = getMasterTeachers(), branches = getBranches(); return success({ message: 'Cache Master Teacher dan Cabang diperbarui.', teachers: teachers.length, branches: branches.length }); }

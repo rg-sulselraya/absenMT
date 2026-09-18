@@ -71,6 +71,11 @@ function showToast(message, tone = '') {
   setTimeout(() => item.remove(), 4000);
 }
 
+function perfLog(label, startedAt, details = {}) {
+  if (!window.console?.info) return;
+  console.info('[MTA PERF]', { label, elapsedMs: Math.round(performance.now() - startedAt), ...details });
+}
+
 async function api(endpoint, options = {}) {
   if (window.MTA_APPS_SCRIPT && window.google?.script?.run) {
     const sessionKey = 'mta_apps_session';
@@ -179,6 +184,8 @@ function setLoginRole(role) {
 }
 
 async function login(event) {
+  const loginStartedAt = performance.now();
+  perfLog('LOGIN_START', loginStartedAt);
   event.preventDefault();
   const form = event.currentTarget;
   const activeRole = $('.role-option.active')?.dataset.loginRole || 'teacher';
@@ -188,11 +195,13 @@ async function login(event) {
   button.disabled = true;
   button.classList.add('loading');
   try {
+    perfLog('REQUEST_SENT', loginStartedAt);
     const payload = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ role: activeRole, id: $('#login-id').value, pin: $('#login-pin').value, deviceId: deviceId() }) });
+    perfLog('FRONTEND_RESPONSE', loginStartedAt);
     state.user = payload.user;
     state.device = payload.device;
     updateServerClock(payload.serverTime);
-    await enterApp();
+    await enterApp(loginStartedAt);
     if (payload.device?.status === 'pending') showToast('Perangkat baru terdeteksi. Menunggu otorisasi Admin.', '');
   } catch (err) {
     errorBox.textContent = err.message;
@@ -203,25 +212,34 @@ async function login(event) {
   }
 }
 
-async function enterApp() {
+async function enterApp(loginStartedAt = performance.now()) {
+  perfLog('DASHBOARD_START', loginStartedAt);
   $('#login-screen').hidden = true;
   $('#app-shell').hidden = false;
   $('#topbar-user-name').textContent = state.user.name;
   $('#topbar-user-role').textContent = state.user.role === 'admin' ? 'Admin' : 'Master Teacher';
   $('#topbar-avatar').textContent = initials(state.user.name);
   renderNav();
-  await loadBaseData();
-  navigate(state.user.role === 'admin' ? 'dashboard' : 'home', true);
+  perfLog('BASE_DATA_START', loginStartedAt);
+  await loadBaseData(loginStartedAt);
+  perfLog('BASE_DATA_END', loginStartedAt);
+  perfLog('DASHBOARD_RENDER_START', loginStartedAt);
+  await navigate(state.user.role === 'admin' ? 'dashboard' : 'home', true);
+  perfLog('DASHBOARD_RENDER_END', loginStartedAt);
 }
 
-async function loadBaseData() {
+async function loadBaseData(loginStartedAt = performance.now()) {
   try {
+    perfLog('CONFIG_REQUEST_START', loginStartedAt);
     const config = await api('/api/config');
+    perfLog('CONFIG_RESPONSE', loginStartedAt, { branches: (config.branches || []).length });
     state.config = config;
     state.branches = config.branches || [];
     if (!state.branches.length) {
+      perfLog('BRANCHES_REQUEST_START', loginStartedAt);
       const branchPayload = await api('/api/branches');
       state.branches = branchPayload.branches || [];
+      perfLog('BRANCHES_RESPONSE', loginStartedAt, { branches: state.branches.length });
     }
     $('#sidebar-branch-chip').textContent = `${state.branches.filter(branch => branch.active).length} cabang`;
     updateServerClock(config.serverTime);
@@ -281,7 +299,10 @@ function deviceBanner() {
 }
 
 async function renderTeacherHome() {
+  const attendanceStartedAt = performance.now();
+  perfLog('HOME_ATTENDANCE_REQUEST_START', attendanceStartedAt);
   const data = await api(`/api/my-attendance?date=${todayLocal()}`).catch(err => { showToast(err.message, 'error'); return { date: todayLocal(), records: [], history: [], logs: [] }; });
+  perfLog('HOME_ATTENDANCE_RESPONSE', attendanceStartedAt, { records: data.records?.length || 0 });
   state.teacherData = data;
   const masuk = data.records.find(record => record.type === 'MASUK');
   const pulang = data.records.find(record => record.type === 'PULANG');
@@ -722,7 +743,7 @@ function init() {
   $('#logout-button').addEventListener('click', logout);
   $('#mobile-menu-button').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
   window.addEventListener('hashchange', () => { const page = location.hash.slice(1); if (state.user && page && pageNames[page]) navigate(page, true); });
-  api('/api/me').then(async payload => { state.user = payload.user; state.device = payload.device; await enterApp(); }).catch(() => {});
+  api('/api/me').then(async payload => { const resumeStartedAt = performance.now(); perfLog('SESSION_RESUME_START', resumeStartedAt); state.user = payload.user; state.device = payload.device; await enterApp(resumeStartedAt); }).catch(() => {});
 }
 
 // app.js is loaded dynamically by index.html. When the network is fast,

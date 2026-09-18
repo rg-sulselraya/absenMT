@@ -86,6 +86,29 @@ APPS_SCRIPT_DEPLOYMENT_ID
 
 Workflow tidak membuat deployment baru setiap kali push; `clasp deploy --deploymentId` membuat versi baru dan memperbarui deployment ID yang sama, sehingga URL `/exec` tetap. Setelah `Code.gs` berhasil dikirim, buka URL Web App dan uji login, cache refresh, serta scan. Jika deployment gagal, periksa log job di GitHub Actions—credential tidak ditampilkan dalam log.
 
+## Audit waktu login Master Teacher
+
+Untuk sementara, `Code.gs` mencatat marker `MTA_PERF` di Apps Script Executions, sedangkan browser mencatat marker `[MTA PERF]` di Developer Console. Log hanya berisi nama tahap, durasi millisecond, jumlah MT terbaca, dan status konfigurasi PIN; PIN maupun hash tidak pernah dicatat. Set `MTA_PERF_LOGGING` ke `false` di Script Properties jika logging ingin dimatikan setelah audit.
+
+Marker utama yang perlu dibandingkan:
+
+```text
+REQUEST_RECEIVED
+LOGIN_START
+READ_MT_START / READ_MT_END
+VALIDATE_ID_START / VALIDATE_ID_END
+PIN_CHECK
+SESSION_START / SESSION_END
+AUTH_END
+RESPONSE_SENT
+FRONTEND_RESPONSE
+CONFIG_RESPONSE
+HOME_ATTENDANCE_RESPONSE
+DASHBOARD_RENDER_END
+```
+
+Jika `RESPONSE_SENT` cepat tetapi `DASHBOARD_RENDER_END` lambat, masalahnya bukan validasi ID/PIN melainkan request konfigurasi atau absensi setelah login. Jika `READ_MT_END` lambat, periksa ukuran tab `Master Teacher` dan cache. Jika `PIN_CHECK` lambat, ukur hash PBKDF2 tanpa menurunkan jumlah iterasi keamanan.
+
 Untuk GitHub Pages, setelah memperbarui `Code.gs`, deploy versi Apps Script terbaru. Bridge GET menerima `path`, serta `method=POST` dan `body` ter-encode untuk operasi login, PIN, device, dan scan karena Web App Apps Script mengalihkan POST biasa.
 
 ## Tahap source of truth Master Teacher dan Cabang
