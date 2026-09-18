@@ -64,6 +64,12 @@ button { cursor: pointer; }
 .input-icon { position: absolute; left: 16px; z-index: 1; color: #9ca9b8; font-size: 11px; font-weight: 800; letter-spacing: -.2px; }
 .password-toggle { position: absolute; right: 10px; border: 0; color: var(--teal-deep); background: transparent; font-size: 11px; font-weight: 700; }
 .form-error { padding: 10px 12px; border-radius: 8px; color: #aa3f49; background: var(--red-pale); font-size: 12px; line-height: 1.45; margin: -3px 0 15px; }
+.form-status { padding: 10px 12px; border-radius: 8px; color: #356b68; background: var(--teal-pale); font-size: 12px; line-height: 1.45; margin: -3px 0 15px; }
+.form-status.error { color: #aa3f49; background: var(--red-pale); }
+.form-status.success { color: #28705f; background: var(--teal-pale); }
+.form-status.loading::before { content: '⏳ '; }
+.form-status.loading { animation: status-pulse 1.5s ease-in-out infinite; }
+@keyframes status-pulse { 0%, 100% { opacity: .72; } 50% { opacity: 1; } }
 .primary-button { border: 0; background: var(--teal); color: #fff; border-radius: 9px; min-height: 48px; padding: 0 17px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; font-weight: 800; box-shadow: 0 7px 15px rgba(29,168,151,.18); transition: .2s; }
 .primary-button:hover { background: var(--teal-deep); transform: translateY(-1px); box-shadow: 0 10px 20px rgba(29,168,151,.22); }
 .login-button { width: 100%; margin-top: 6px; justify-content: space-between; padding: 0 17px 0 20px; }

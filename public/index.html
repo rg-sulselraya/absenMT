@@ -46,6 +46,7 @@
             <div class="input-wrap"><span class="input-icon">ID</span><input id="login-id" name="id" autocomplete="username" placeholder="Contoh: MT001" required /></div>
             <label class="field-label" for="login-pin">PIN 6 digit</label>
             <div class="input-wrap"><span class="input-icon">••</span><input id="login-pin" type="password" name="pin" autocomplete="current-password" placeholder="Masukkan PIN" required /><button class="password-toggle" type="button" aria-label="Tampilkan PIN">Lihat</button></div>
+            <div id="login-status" class="form-status" hidden aria-live="polite"></div>
             <div id="login-error" class="form-error" hidden></div>
             <button class="primary-button login-button" type="submit"><span>Masuk ke dashboard</span><span class="button-arrow">↗</span></button>
           </form>
@@ -87,7 +88,7 @@
     </script>
     <script>
       (() => {
-        const candidates = ['app.js?v=12', 'public/app.js?v=12'];
+        const candidates = ['app.js?v=14', 'public/app.js?v=14'];
         const load = index => {
           if (index >= candidates.length) return;
           const script = document.createElement('script');

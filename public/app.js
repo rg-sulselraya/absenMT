@@ -12,6 +12,9 @@ const state = {
   devices: [],
   sheetsTest: null,
   lastResult: null,
+  isLoggingIn: false,
+  isSavingPin: false,
+  loginProgressTimers: [],
   scanner: { stream: null, raf: null, detector: null, detecting: false, processing: false, canvas: null, context: null, lastDecodeAt: 0 },
   serverTime: null,
   serverTimeReceivedAt: null,
@@ -74,6 +77,42 @@ function showToast(message, tone = '') {
 function perfLog(label, startedAt, details = {}) {
   if (!window.console?.info) return;
   console.info('[MTA PERF]', { label, elapsedMs: Math.round(performance.now() - startedAt), ...details });
+}
+
+function setLoginStatus(message, tone = 'loading') {
+  const status = $('#login-status');
+  if (!status) return;
+  status.textContent = message;
+  status.className = `form-status ${tone}`;
+  status.hidden = !message;
+}
+
+function clearLoginProgressTimers() {
+  state.loginProgressTimers.forEach(timer => clearTimeout(timer));
+  state.loginProgressTimers = [];
+}
+
+function startLoginProgress(button) {
+  clearLoginProgressTimers();
+  const label = button.querySelector('span:first-child');
+  button.dataset.defaultLabel = label?.textContent || 'Masuk ke dashboard';
+  if (label) label.textContent = '⏳ Memproses...';
+  button.disabled = true;
+  button.classList.add('loading');
+  setLoginStatus('Sedang memverifikasi data Master Teacher... Mohon tunggu dan jangan tekan tombol kembali.');
+  state.loginProgressTimers = [
+    setTimeout(() => setLoginStatus('Menghubungkan ke sistem...'), 0),
+    setTimeout(() => setLoginStatus('Sedang memverifikasi data Master Teacher...'), 3000),
+    setTimeout(() => setLoginStatus('Proses masih berjalan, mohon tunggu...'), 10000),
+  ];
+}
+
+function stopLoginProgress(button) {
+  clearLoginProgressTimers();
+  const label = button.querySelector('span:first-child');
+  if (label) label.textContent = button.dataset.defaultLabel || 'Masuk ke dashboard';
+  button.disabled = false;
+  button.classList.remove('loading');
 }
 
 async function api(endpoint, options = {}) {
@@ -184,6 +223,7 @@ function setLoginRole(role) {
 }
 
 async function login(event) {
+  if (state.isLoggingIn) return;
   const loginStartedAt = performance.now();
   perfLog('LOGIN_START', loginStartedAt);
   event.preventDefault();
@@ -191,9 +231,9 @@ async function login(event) {
   const activeRole = $('.role-option.active')?.dataset.loginRole || 'teacher';
   const errorBox = $('#login-error');
   const button = form.querySelector('button[type="submit"]');
+  state.isLoggingIn = true;
   errorBox.hidden = true;
-  button.disabled = true;
-  button.classList.add('loading');
+  startLoginProgress(button);
   try {
     perfLog('REQUEST_SENT', loginStartedAt);
     const payload = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ role: activeRole, id: $('#login-id').value, pin: $('#login-pin').value, deviceId: deviceId() }) });
@@ -201,14 +241,17 @@ async function login(event) {
     state.user = payload.user;
     state.device = payload.device;
     updateServerClock(payload.serverTime);
+    setLoginStatus('Login berhasil. Membuka dashboard...', 'success');
+    showToast('✅ Login berhasil.', 'success');
     await enterApp(loginStartedAt);
     if (payload.device?.status === 'pending') showToast('Perangkat baru terdeteksi. Menunggu otorisasi Admin.', '');
   } catch (err) {
     errorBox.textContent = err.message;
     errorBox.hidden = false;
+    setLoginStatus('', 'error');
   } finally {
-    button.disabled = false;
-    button.classList.remove('loading');
+    state.isLoggingIn = false;
+    stopLoginProgress(button);
   }
 }
 
@@ -445,6 +488,13 @@ function stopCamera() {
   $('#scanner-stage')?.classList.remove('scanning');
 }
 
+function setScannerProcessing(busy) {
+  ['#start-camera-button', '#photo-qr-button', '#stop-camera-button', '#manual-qr-button', '#manual-qr'].forEach(selector => {
+    const element = $(selector);
+    if (element) element.disabled = busy;
+  });
+}
+
 async function processQr(value) {
   if (state.scanner.processing) return;
   const payload = String(value || '').trim().toUpperCase();
@@ -453,15 +503,17 @@ async function processQr(value) {
   if (!branch) return showToast('QR tidak valid atau cabang tidak aktif. Minta scan ulang.', 'error');
   stopCamera();
   state.scanner.processing = true;
+  setScannerProcessing(true);
   const note = $('#scanner-note');
-  if (note) note.textContent = `QR ${payload} terbaca. Menentukan lokasi…`;
+  if (note) note.textContent = `⏳ Memproses absensi… Menentukan lokasi...`;
   if (!navigator.geolocation) {
     state.scanner.processing = false;
+    setScannerProcessing(false);
     return showToast('GPS tidak tersedia di perangkat ini. Absensi tidak disimpan.', 'error');
   }
   try {
     const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
-    if (note) note.textContent = 'Lokasi ditemukan. Menyimpan absensi…';
+    if (note) note.textContent = '⏳ Lokasi ditemukan. Menyimpan absensi...';
     const result = await api('/api/attendance/scan', { method: 'POST', body: JSON.stringify({ branchId: payload, latitude: position.coords.latitude, longitude: position.coords.longitude }) });
     state.lastResult = result;
     if (result.complete) showToast(result.message, 'success');
@@ -472,6 +524,7 @@ async function processQr(value) {
     if (note) note.textContent = messages[err.code] || err.message;
   } finally {
     state.scanner.processing = false;
+    setScannerProcessing(false);
   }
 }
 
@@ -652,23 +705,43 @@ function closeModal() { $('#modal-root').innerHTML = ''; }
 function openPinModal(teacher) {
   if (!teacher) return;
   const action = teacher.pinConfigured ? 'Reset PIN' : 'Buat PIN';
-  openModal(`<div class="modal-header"><div><h3>${action} Master Teacher</h3><p>${escapeHtml(teacher.name)} · ${escapeHtml(teacher.id)}</p></div><button class="modal-close">×</button></div><div class="modal-body"><form id="teacher-pin-form"><div class="form-grid"><div class="form-field"><label>PIN baru (6 digit)</label><input name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{6}" required placeholder="Contoh: 482731" /></div><div class="form-field"><label>Konfirmasi PIN</label><input name="confirmation" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{6}" required placeholder="Ulangi PIN baru" /></div></div><p class="form-note">PIN tidak disimpan di Google Sheet dan tidak ditampilkan kembali setelah disimpan.</p><div class="form-actions"><button type="button" class="secondary-button modal-cancel">Batal</button><button type="submit" class="primary-button">${action}</button></div></form></div>`);
+  openModal(`<div class="modal-header"><div><h3>${action} Master Teacher</h3><p>${escapeHtml(teacher.name)} · ${escapeHtml(teacher.id)}</p></div><button class="modal-close">×</button></div><div class="modal-body"><form id="teacher-pin-form"><div class="form-grid"><div class="form-field"><label>PIN baru (6 digit)</label><input name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{6}" required placeholder="Contoh: 482731" /></div><div class="form-field"><label>Konfirmasi PIN</label><input name="confirmation" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{6}" required placeholder="Ulangi PIN baru" /></div></div><p id="teacher-pin-status" class="form-status" hidden aria-live="polite"></p><p class="form-note">PIN tidak disimpan di Google Sheet dan tidak ditampilkan kembali setelah disimpan.</p><div class="form-actions"><button type="button" class="secondary-button modal-cancel">Batal</button><button type="submit" class="primary-button">${action}</button></div></form></div>`);
   $('.modal-cancel').addEventListener('click', closeModal);
   $('#teacher-pin-form').addEventListener('submit', async event => {
     event.preventDefault();
+    if (state.isSavingPin) return;
+    const pinStartedAt = performance.now();
+    perfLog('PIN_CREATE_START', pinStartedAt);
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
     if (!/^\d{6}$/.test(data.pin)) return showToast('PIN harus terdiri dari tepat 6 digit.', 'error');
     if (data.pin !== data.confirmation) return showToast('Konfirmasi PIN tidak sama.', 'error');
     const submit = event.currentTarget.querySelector('button[type="submit"]');
+    const cancel = event.currentTarget.querySelector('.modal-cancel');
+    const inputs = [...event.currentTarget.querySelectorAll('input')];
+    const status = $('#teacher-pin-status');
+    state.isSavingPin = true;
     submit.disabled = true;
+    if (cancel) cancel.disabled = true;
+    inputs.forEach(input => { input.disabled = true; });
+    submit.textContent = `⏳ ${action}...`;
+    if (status) { status.textContent = `Sedang ${action === 'Buat PIN' ? 'membuat' : 'mereset'} PIN Master Teacher... Mohon tunggu dan jangan tekan tombol kembali.`; status.className = 'form-status loading'; status.hidden = false; }
     try {
       await api(`/api/teachers/${encodeURIComponent(teacher.id)}/pin`, { method: 'POST', body: JSON.stringify({ pin: data.pin }) });
+      perfLog('PIN_CREATE_RESPONSE', pinStartedAt);
       closeModal();
-      showToast(`${action} berhasil disimpan.`, 'success');
+      showToast(action === 'Buat PIN' ? '✅ PIN berhasil dibuat.' : '✅ PIN berhasil direset.', 'success');
+      perfLog('PIN_TEACHER_LIST_START', pinStartedAt);
       await renderTeachers();
+      perfLog('PIN_TEACHER_LIST_END', pinStartedAt);
     } catch (err) {
       showToast(err.message, 'error');
+      if (status) { status.textContent = '❌ PIN gagal disimpan. Silakan coba lagi.'; status.className = 'form-status error'; status.hidden = false; }
       submit.disabled = false;
+      if (cancel) cancel.disabled = false;
+      inputs.forEach(input => { input.disabled = false; });
+      submit.textContent = action;
+    } finally {
+      state.isSavingPin = false;
     }
   });
 }

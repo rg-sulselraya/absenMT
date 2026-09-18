@@ -105,6 +105,11 @@ FRONTEND_RESPONSE
 CONFIG_RESPONSE
 HOME_ATTENDANCE_RESPONSE
 DASHBOARD_RENDER_END
+PIN_CREATE_START
+PIN_HASH_END
+PIN_SAVE_END
+PIN_CREATE_RESPONSE
+PIN_TEACHER_LIST_START / PIN_TEACHER_LIST_END
 ```
 
 Jika `RESPONSE_SENT` cepat tetapi `DASHBOARD_RENDER_END` lambat, masalahnya bukan validasi ID/PIN melainkan request konfigurasi atau absensi setelah login. Jika `READ_MT_END` lambat, periksa ukuran tab `Master Teacher` dan cache. Jika `PIN_CHECK` lambat, ukur hash PBKDF2 tanpa menurunkan jumlah iterasi keamanan.
