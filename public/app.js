@@ -92,18 +92,19 @@ function clearLoginProgressTimers() {
   state.loginProgressTimers = [];
 }
 
-function startLoginProgress(button) {
+function startLoginProgress(button, role) {
   clearLoginProgressTimers();
   const label = button.querySelector('span:first-child');
+  const isAdmin = role === 'admin';
   button.dataset.defaultLabel = label?.textContent || 'Masuk ke dashboard';
   if (label) label.textContent = '⏳ Memproses...';
   button.disabled = true;
   button.classList.add('loading');
-  setLoginStatus('Sedang memverifikasi data Master Teacher... Mohon tunggu dan jangan tekan tombol kembali.');
+  setLoginStatus(isAdmin ? 'Sedang memverifikasi login Admin... Mohon tunggu dan jangan tekan tombol kembali.' : 'Sedang memverifikasi data Master Teacher... Mohon tunggu dan jangan tekan tombol kembali.');
   state.loginProgressTimers = [
     setTimeout(() => setLoginStatus('Menghubungkan ke sistem...'), 0),
-    setTimeout(() => setLoginStatus('Sedang memverifikasi data Master Teacher...'), 3000),
-    setTimeout(() => setLoginStatus('Proses masih berjalan, mohon tunggu...'), 10000),
+    setTimeout(() => setLoginStatus(isAdmin ? 'Memverifikasi credential Admin...' : 'Sedang memverifikasi data Master Teacher...'), 3000),
+    setTimeout(() => setLoginStatus(isAdmin ? 'Login Admin masih diproses, mohon tunggu...' : 'Proses masih berjalan, mohon tunggu...'), 10000),
   ];
 }
 
@@ -233,7 +234,7 @@ async function login(event) {
   const button = form.querySelector('button[type="submit"]');
   state.isLoggingIn = true;
   errorBox.hidden = true;
-  startLoginProgress(button);
+  startLoginProgress(button, activeRole);
   try {
     perfLog('REQUEST_SENT', loginStartedAt);
     const payload = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ role: activeRole, id: $('#login-id').value, pin: $('#login-pin').value, deviceId: deviceId() }) });
