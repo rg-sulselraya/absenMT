@@ -79,6 +79,23 @@ function perfLog(label, startedAt, details = {}) {
   console.info('[MTA PERF]', { label, elapsedMs: Math.round(performance.now() - startedAt), ...details });
 }
 
+const SESSION_KEY = 'mta_apps_session';
+
+function readSessionToken() {
+  return sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY) || '';
+}
+
+function rememberSessionToken(token) {
+  if (!token) return;
+  sessionStorage.setItem(SESSION_KEY, token);
+  localStorage.setItem(SESSION_KEY, token);
+}
+
+function clearRememberedSession() {
+  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
+}
+
 function setLoginStatus(message, tone = 'loading') {
   const status = $('#login-status');
   if (!status) return;
@@ -118,8 +135,7 @@ function stopLoginProgress(button) {
 
 async function api(endpoint, options = {}) {
   if (window.MTA_APPS_SCRIPT && window.google?.script?.run) {
-    const sessionKey = 'mta_apps_session';
-    const sessionToken = sessionStorage.getItem(sessionKey) || '';
+    const sessionToken = readSessionToken();
     const requestBody = typeof options.body === 'string' ? (() => { try { return JSON.parse(options.body); } catch { return {}; } })() : (options.body || {});
     const payload = await new Promise((resolve, reject) => {
       const runner = window.google.script.run
@@ -134,13 +150,12 @@ async function api(endpoint, options = {}) {
       err.status = payload?.status || 400;
       throw err;
     }
-    if (payload.sessionToken) sessionStorage.setItem(sessionKey, payload.sessionToken);
-    if (endpoint === '/api/auth/logout') sessionStorage.removeItem(sessionKey);
+    if (payload.sessionToken) rememberSessionToken(payload.sessionToken);
+    if (endpoint === '/api/auth/logout') clearRememberedSession();
     return payload;
   }
   if (window.MTA_API_BASE) {
-    const sessionKey = 'mta_apps_session';
-    const sessionToken = sessionStorage.getItem(sessionKey) || '';
+    const sessionToken = readSessionToken();
     const method = String(options.method || 'GET').toUpperCase();
     const requestBody = typeof options.body === 'string' ? options.body : JSON.stringify(options.body || {});
     const separator = window.MTA_API_BASE.includes('?') ? '&' : '?';
@@ -158,8 +173,8 @@ async function api(endpoint, options = {}) {
       err.status = payload.status || response.status;
       throw err;
     }
-    if (payload.sessionToken) sessionStorage.setItem(sessionKey, payload.sessionToken);
-    if (endpoint === '/api/auth/logout') sessionStorage.removeItem(sessionKey);
+    if (payload.sessionToken) rememberSessionToken(payload.sessionToken);
+    if (endpoint === '/api/auth/logout') clearRememberedSession();
     return payload;
   }
   const response = await fetch(endpoint, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
@@ -265,11 +280,12 @@ async function enterApp(loginStartedAt = performance.now()) {
   $('#topbar-avatar').textContent = initials(state.user.name);
   renderNav();
   perfLog('BASE_DATA_START', loginStartedAt);
-  await loadBaseData(loginStartedAt);
-  perfLog('BASE_DATA_END', loginStartedAt);
+  const baseDataPromise = loadBaseData(loginStartedAt).then(() => perfLog('BASE_DATA_END', loginStartedAt));
   perfLog('DASHBOARD_RENDER_START', loginStartedAt);
+  // Show the destination immediately; configuration loads in parallel.
   await navigate(state.user.role === 'admin' ? 'dashboard' : 'home', true);
   perfLog('DASHBOARD_RENDER_END', loginStartedAt);
+  await baseDataPromise;
 }
 
 async function loadBaseData(loginStartedAt = performance.now()) {
@@ -801,6 +817,7 @@ async function refreshMasterDataCache() {
 async function logout() {
   stopCamera();
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+  clearRememberedSession();
   state.user = null;
   state.device = null;
   state.config = null;
@@ -817,7 +834,7 @@ function init() {
   $('#logout-button').addEventListener('click', logout);
   $('#mobile-menu-button').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
   window.addEventListener('hashchange', () => { const page = location.hash.slice(1); if (state.user && page && pageNames[page]) navigate(page, true); });
-  api('/api/me').then(async payload => { const resumeStartedAt = performance.now(); perfLog('SESSION_RESUME_START', resumeStartedAt); state.user = payload.user; state.device = payload.device; await enterApp(resumeStartedAt); }).catch(() => {});
+  api('/api/me').then(async payload => { const resumeStartedAt = performance.now(); perfLog('SESSION_RESUME_START', resumeStartedAt); state.user = payload.user; state.device = payload.device; await enterApp(resumeStartedAt); }).catch(() => { clearRememberedSession(); });
 }
 
 // app.js is loaded dynamically by index.html. When the network is fast,
