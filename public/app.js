@@ -312,6 +312,8 @@ async function loadBaseData(loginStartedAt = performance.now()) {
 
 function renderNav() {
   const isAdmin = state.user.role === 'admin';
+  $('#app-shell').classList.toggle('admin-shell', isAdmin);
+  $('#app-shell').classList.toggle('teacher-shell', !isAdmin);
   const groups = isAdmin ? [
     { title: 'OVERVIEW', items: [['dashboard', '⌂', 'Dashboard'], ['attendance', '◷', 'Absensi']] },
     { title: 'DATA MASTER', items: [['teachers', '♙', 'Master Teacher'], ['branches', '⌖', 'Cabang']] },
