@@ -282,10 +282,12 @@ async function enterApp(loginStartedAt = performance.now()) {
   perfLog('BASE_DATA_START', loginStartedAt);
   const baseDataPromise = loadBaseData(loginStartedAt).then(() => perfLog('BASE_DATA_END', loginStartedAt));
   perfLog('DASHBOARD_RENDER_START', loginStartedAt);
-  // Show the destination immediately; configuration loads in parallel.
-  await navigate(state.user.role === 'admin' ? 'dashboard' : 'home', true);
-  perfLog('DASHBOARD_RENDER_END', loginStartedAt);
-  await baseDataPromise;
+  // Show the destination immediately; configuration and page data load in parallel.
+  // The page starts with its skeleton, so login does not remain blocked by slow Sheets/API calls.
+  const navigationPromise = navigate(state.user.role === 'admin' ? 'dashboard' : 'home', true)
+    .then(() => perfLog('DASHBOARD_RENDER_END', loginStartedAt))
+    .catch(err => showToast(err.message, 'error'));
+  void Promise.all([baseDataPromise, navigationPromise]);
 }
 
 async function loadBaseData(loginStartedAt = performance.now()) {
