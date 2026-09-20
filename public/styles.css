@@ -635,6 +635,59 @@ body { background: var(--background); color: var(--text); }
   .welcome-card { box-shadow: 0 10px 24px rgba(21, 59, 88, .16); }
 }
 
+/* Glacier palette: cool blue, icy cyan, and clean white surfaces. */
+:root {
+  --navy: #163b56;
+  --navy-deep: #102f47;
+  --teal: #36a8c1;
+  --teal-deep: #197d99;
+  --teal-pale: #e6f5fa;
+  --primary: #299db8;
+  --primary-hover: #1d7f9a;
+  --background: #f3f9fc;
+  --canvas: #f3f9fc;
+  --surface-soft: #f7fcfe;
+  --line: #e0edf2;
+  --border: #dceaf0;
+  --ink: #173449;
+  --text: #173449;
+  --ink-soft: #61788a;
+  --text-secondary: #61788a;
+}
+
+.login-visual { background: #153d59; }
+.visual-copy h1 span, .visual-brand em { color: #86dce7; }
+.visual-footer { color: rgba(224, 248, 252, .62); }
+.signal-dot { background: #72d5e2; box-shadow: 0 0 0 4px rgba(114, 213, 226, .15); }
+.brand-mark { background: var(--primary); box-shadow: 0 7px 15px rgba(41, 157, 184, .2); }
+.brand-mark-light { background: rgba(132, 220, 231, .15); color: #9be3eb; border-color: rgba(155, 227, 235, .22); }
+.role-option.active { color: var(--primary-hover); }
+.primary-button { background: var(--primary); box-shadow: 0 7px 16px rgba(41, 157, 184, .18); }
+.primary-button:hover { background: var(--primary-hover); }
+.input-wrap input:focus, .form-field input:focus, .form-field select:focus, .form-field textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(41, 157, 184, .12); }
+.sidebar { background: #fbfeff; }
+.pilot-chip { background: #eaf7fb; color: #6c8998; }
+.pilot-chip b { color: var(--primary-hover); }
+.nav-item.active { background: #e6f5fa; color: var(--primary-hover); box-shadow: inset 3px 0 0 var(--primary); }
+.nav-item:hover { background: #f0f9fc; color: var(--ink); }
+.welcome-card { background: #16445f; box-shadow: 0 14px 32px rgba(20, 74, 101, .18); }
+.welcome-card .eyebrow { color: #8bdde7; }
+.stat-icon.teal, .activity-mark { background: var(--teal-pale); color: var(--teal-deep); }
+.page-intro-badge { color: var(--teal-deep); background: var(--teal-pale); }
+.scanner-stage { background: #102f47; }
+.scanner-frame { border-color: #79dce6; }
+.scanner-line { background: #79dce6; box-shadow: 0 0 11px #79dce6; }
+.manual-scan button { background: var(--primary); }
+.maps-link, .card-link, .record-link { color: var(--teal-deep); }
+.setting-value { color: var(--teal-deep); background: var(--teal-pale); }
+.tiny-button.approve { color: var(--teal-deep); background: var(--teal-pale); }
+.toast.success { background: #197d88; }
+
+@media (max-width: 760px) {
+  .teacher-shell .sidebar { background: rgba(251, 254, 255, .98); }
+  .teacher-shell .nav-item.active { background: #e6f5fa; color: var(--primary-hover); }
+}
+
 @media (max-width: 1080px) {
   .sidebar { width: 218px; }
   .topbar { padding: 0 25px; }
