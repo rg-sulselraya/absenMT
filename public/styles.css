@@ -688,6 +688,35 @@ body { background: var(--background); color: var(--text); }
   .teacher-shell .nav-item.active { background: #e6f5fa; color: var(--primary-hover); }
 }
 
+/* Keep every UI state inside the Glacier family, including warnings and errors. */
+:root {
+  --yellow: #4b9bb3;
+  --yellow-pale: #edf9fc;
+  --orange: #3186a2;
+  --orange-pale: #e9f7fb;
+  --red: #245f79;
+  --red-pale: #e7f3f8;
+  --blue: #398eaf;
+}
+
+.stat-icon.green,
+.stat-icon.yellow,
+.stat-icon.blue,
+.stat-icon.orange { background: var(--teal-pale); color: var(--teal-deep); }
+.status-pill.green,
+.status-pill.yellow,
+.status-pill.orange,
+.status-pill.red { color: var(--teal-deep); background: var(--teal-pale); }
+.attention-card { background: #edf9fc; border-color: #d4edf3; }
+.attention-icon { background: #d9f1f6; color: var(--teal-deep); }
+.attention-card h4 { color: #286c80; }
+.attention-card p { color: #5f8794; }
+.attention-card button { color: var(--teal-deep); }
+.result-warning { background: var(--red-pale); color: #2b6e82; }
+.form-error { color: #286c80; background: var(--red-pale); }
+.device-banner.pending { color: #316f81; background: var(--yellow-pale); border-color: #d5edf3; }
+.toast.error { background: #286b82; }
+
 @media (max-width: 1080px) {
   .sidebar { width: 218px; }
   .topbar { padding: 0 25px; }
