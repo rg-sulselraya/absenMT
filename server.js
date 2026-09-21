@@ -80,6 +80,17 @@ function today() {
   return dateParts().date;
 }
 
+function normalizeAttendanceDate(value, fallback = '') {
+  const text = String(value ?? '').trim();
+  const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
+  if (dateMatch && !['1899-12-30', '1900-01-01'].includes(dateMatch[1])) return dateMatch[1];
+  if (/^\d+(?:\.\d+)?$/.test(text) && Number(text) > 1) {
+    return new Date(Date.UTC(1899, 11, 30) + Number(text) * 86400000).toISOString().slice(0, 10);
+  }
+  const fallbackMatch = String(fallback ?? '').match(/(\d{4}-\d{2}-\d{2})/);
+  return fallbackMatch ? fallbackMatch[1] : '';
+}
+
 function loadStore() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   if (fs.existsSync(DATA_FILE)) {
@@ -556,15 +567,16 @@ function parseAttendance(values) {
     const status = String(sheetColumn(row, headers, ['status lokasi', 'status'])).trim();
     const distance = sheetColumn(row, headers, ['jarak (meter)', 'jarak', 'distance']);
     const type = String(sheetColumn(row, headers, ['jenis absensi', 'jenis', 'type'])).trim();
+    const timestamp = String(sheetColumn(row, headers, ['timestamp'])).trim();
     return {
       attendanceId: String(sheetColumn(row, headers, ['id absensi', 'attendance id', 'id'])).trim(),
-      date: String(sheetColumn(row, headers, ['tanggal', 'date'])).trim(),
+      date: normalizeAttendanceDate(sheetColumn(row, headers, ['tanggal', 'date']), timestamp),
       mtId: String(sheetColumn(row, headers, ['id mt', 'id master teacher'])).trim(),
       mtName: String(sheetColumn(row, headers, ['nama master teacher', 'nama'])).trim(),
       branchId: String(sheetColumn(row, headers, ['id cabang', 'branch id'])).trim(),
       branchName: String(sheetColumn(row, headers, ['nama cabang', 'cabang'])).trim(),
       type,
-      timestamp: String(sheetColumn(row, headers, ['timestamp'])).trim(),
+      timestamp,
       time: String(sheetColumn(row, headers, ['jam', 'time'])).trim(),
       latitude: sheetColumn(row, headers, ['latitude']) === '' ? null : Number(sheetColumn(row, headers, ['latitude'])),
       longitude: sheetColumn(row, headers, ['longitude']) === '' ? null : Number(sheetColumn(row, headers, ['longitude'])),

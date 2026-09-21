@@ -32,14 +32,27 @@ function todayLocal() {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+function displayAttendanceDate(value, fallback = '') {
+  const text = String(value ?? '').trim();
+  const match = text.match(/(\d{4}-\d{2}-\d{2})/);
+  if (match && !['1899-12-30', '1900-01-01'].includes(match[1])) return match[1];
+  if (/^\d+(?:\.\d+)?$/.test(text) && Number(text) > 1) {
+    return new Date(Date.UTC(1899, 11, 30) + Number(text) * 86400000).toISOString().slice(0, 10);
+  }
+  const fallbackMatch = String(fallback ?? '').match(/(\d{4}-\d{2}-\d{2})/);
+  return fallbackMatch ? fallbackMatch[1] : '';
+}
+
 function humanDate(date) {
-  if (!date) return '—';
-  return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: state.config?.settings?.timezone || 'Asia/Makassar' }).format(new Date(`${date}T12:00:00`));
+  const normalized = displayAttendanceDate(date);
+  if (!normalized) return '—';
+  return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: state.config?.settings?.timezone || 'Asia/Makassar' }).format(new Date(`${normalized}T12:00:00`));
 }
 
 function humanShortDate(date) {
-  if (!date) return '—';
-  return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: state.config?.settings?.timezone || 'Asia/Makassar' }).format(new Date(`${date}T12:00:00`));
+  const normalized = displayAttendanceDate(date);
+  if (!normalized) return '—';
+  return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: state.config?.settings?.timezone || 'Asia/Makassar' }).format(new Date(`${normalized}T12:00:00`));
 }
 
 function formatDistance(meters) {
