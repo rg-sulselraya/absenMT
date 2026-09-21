@@ -397,10 +397,10 @@ async function renderTeacherHome() {
   state.teacherData = data;
   const masuk = data.records.find(record => record.type === 'MASUK');
   const pulang = data.records.find(record => record.type === 'PULANG');
-  $('#page-content').innerHTML = `${pageHeading(`Halo, ${escapeHtml(state.user.name)}!`, 'Pantau status kehadiran dan lakukan absensi Anda hari ini.', `<button class="primary-button" data-action="go-scan"><span class="scan-glyph">⌗</span> Scan QR Absensi</button>`)}
+  $('#page-content').innerHTML = `${pageHeading(`Halo, ${escapeHtml(state.user.name)}!`, 'Pantau status kehadiran dan lakukan absensi Anda hari ini.')}
     ${deviceBanner()}
     <div class="teacher-home">
-      <section class="welcome-card"><p class="eyebrow light">KEHADIRAN HARI INI</p><h2>Selamat bekerja,<br>${escapeHtml(state.user.name)}.</h2><p>Pastikan Anda melakukan scan di area cabang untuk pencatatan lokasi yang akurat.</p><div class="welcome-bottom"><div class="welcome-date"><strong>${humanDate(data.date)}</strong>Waktu mengikuti server</div><button class="scan-button" data-action="go-scan"><span class="scan-glyph">⌗</span> SCAN QR ABSENSI <span>↗</span></button></div></section>
+      <section class="welcome-card"><p class="eyebrow light">KEHADIRAN HARI INI</p><h2>Catat kehadiran<br>Anda dengan mudah.</h2><p>Scan QR di area cabang untuk mencatat lokasi dan waktu secara akurat.</p><div class="welcome-bottom"><div class="welcome-date"><strong>${humanDate(data.date)}</strong>Waktu mengikuti server</div><button class="scan-button" data-action="go-scan"><span class="scan-glyph">⌗</span> SCAN QR ABSENSI <span>↗</span></button></div></section>
       <section class="card status-card"><h3>Status absensi</h3><div class="status-row"><span>Jam masuk</span><strong class="${masuk ? 'done-in' : ''}">${masuk ? `✓ ${displayAttendanceTime(masuk.time)}` : 'Belum scan'}</strong></div><div class="status-row"><span>Lokasi masuk</span><span>${masuk ? statusPill(masuk) : '—'}</span></div><div class="status-row"><span>Jam pulang</span><strong class="${pulang ? 'done-out' : ''}">${pulang ? `✓ ${displayAttendanceTime(pulang.time)}` : 'Belum scan'}</strong></div><div class="status-row"><span>Lokasi pulang</span><span>${pulang ? statusPill(pulang) : '—'}</span></div></section>
     </div>
     <section class="card scan-history-card"><div class="card-header"><div><h3>Aktivitas hari ini</h3><p>Catatan kehadiran dari perangkat Anda</p></div><button class="card-link" data-nav="history">Lihat semua →</button></div>${renderActivity(data.logs?.slice(0, 4))}</section>`;
