@@ -43,6 +43,20 @@ function displayAttendanceDate(value, fallback = '') {
   return fallbackMatch ? fallbackMatch[1] : '';
 }
 
+function displayAttendanceTime(value) {
+  const text = String(value ?? '').trim();
+  const match = text.match(/(?:T|\s)(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (match) return `${String(match[1]).padStart(2, '0')}:${match[2]}:${match[3] || '00'}`;
+  if (/^\d+(?:\.\d+)?$/.test(text)) {
+    const totalSeconds = Math.round((Number(text) % 1) * 86400) % 86400;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return [hours, minutes, seconds].map(valuePart => String(valuePart).padStart(2, '0')).join(':');
+  }
+  return text || '—';
+}
+
 function humanDate(date) {
   const normalized = displayAttendanceDate(date);
   if (!normalized) return '—';
