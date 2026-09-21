@@ -543,6 +543,15 @@ function setScannerProcessing(busy) {
   });
 }
 
+function geolocationErrorMessage(error) {
+  const messages = {
+    1: 'Izin lokasi ditolak. Aktifkan Location untuk browser ini melalui pengaturan perangkat, lalu muat ulang halaman.',
+    2: 'Lokasi tidak dapat ditemukan. Pastikan Location/GPS perangkat aktif dan coba lagi di tempat dengan sinyal yang lebih baik.',
+    3: 'Pengambilan lokasi terlalu lama. Pastikan Location/GPS aktif, lalu coba scan lagi.'
+  };
+  return messages[error?.code] || 'Lokasi tidak dapat diambil. Aktifkan Location/GPS lalu coba lagi.';
+}
+
 async function processQr(value) {
   if (state.scanner.processing) return;
   const payload = String(value || '').trim().toUpperCase();
@@ -568,8 +577,9 @@ async function processQr(value) {
     await navigate('result');
   } catch (err) {
     const messages = { GPS_INVALID: 'GPS tidak tersedia atau koordinat tidak valid. Aktifkan lokasi lalu coba lagi.', DEVICE_PENDING: 'Perangkat belum diotorisasi Admin.', BRANCH_COORDINATES_MISSING: 'Koordinat cabang belum dikonfigurasi Admin.', RATE_LIMITED: err.message };
-    showToast(messages[err.code] || err.message, 'error');
-    if (note) note.textContent = messages[err.code] || err.message;
+    const message = typeof err?.code === 'number' ? geolocationErrorMessage(err) : (messages[err.code] || err.message);
+    showToast(message, 'error');
+    if (note) note.textContent = message;
   } finally {
     state.scanner.processing = false;
     setScannerProcessing(false);
