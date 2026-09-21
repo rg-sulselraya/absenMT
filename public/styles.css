@@ -290,7 +290,16 @@ button { cursor: pointer; }
 .switch input:checked + .slider::before { transform: translateX(16px); }
 .form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 23px; }
 .form-actions .primary-button { min-height: 39px; font-size: 10px; box-shadow: none; }
+.qr-section { margin-top: 18px; }
+.section-heading { margin: 0 0 12px; }
+.section-heading h3 { font: 700 15px 'Manrope', sans-serif; margin: 0 0 5px; }
+.section-heading p { color: #8493a3; font-size: 11px; margin: 0; }
+.qr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: 18px; }
 .qr-card { padding: 21px; text-align: center; }
+.qr-card-heading { min-height: 38px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 14px; text-align: left; }
+.qr-card-heading h3 { margin: 0 0 4px; }
+.qr-card-heading p { color: #8493a3; font: 700 10px ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0; }
+.qr-card-inactive { opacity: .78; }
 .qr-card h3 { font: 700 13px 'Manrope', sans-serif; margin: 0 0 6px; }
 .qr-card > p { color: #9da8b5; font-size: 10px; margin: 0 0 17px; line-height: 1.5; }
 .qr-canvas-wrap { display: inline-grid; place-items: center; background: #fff; border: 1px dashed #d8e2e5; border-radius: 11px; padding: 14px; min-width: 188px; min-height: 188px; }

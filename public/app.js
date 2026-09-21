@@ -672,17 +672,23 @@ async function renderBranches() {
   const branch = state.branches.find(item => item.id === state.config?.settings?.activeBranchId) || state.branches[0];
   if (!branch) { $('#page-content').innerHTML = `${pageHeading('Cabang', 'Data utama dibaca dari tab Google Sheet “Branches”.')}<section class="card"><div class="empty-state"><strong>Belum ada data cabang di Google Sheet</strong><span>Tambahkan baris pada tab “Branches”, lalu muat ulang.</span></div></section>`; bindContentEvents(); return; }
   $('#page-content').innerHTML = `${pageHeading('Cabang', 'Data utama dibaca dari tab Google Sheet “Branches”.')}<section class="card table-card"><div class="card-header"><div><h3>Daftar Cabang</h3><p>${state.branches.length} cabang terbaca dari Google Sheet</p></div><span class="page-intro-badge">SOURCE: GOOGLE SHEETS</span></div><div class="table-scroll"><table class="attendance-table"><thead><tr><th>ID Cabang</th><th>Nama Cabang</th><th>Alamat</th><th>Latitude</th><th>Longitude</th><th>Radius (Meter)</th><th>Status</th></tr></thead><tbody>${state.branches.map(item => `<tr><td><strong>${escapeHtml(item.id)}</strong></td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.address || '—')}</td><td class="distance">${item.latitude ?? (item.latitudeRaw ? '<span title="Isi dengan angka desimal GPS, misalnya -5.123456">Format tidak valid</span>' : '—')}</td><td class="distance">${item.longitude ?? (item.longitudeRaw ? '<span title="Isi dengan angka desimal GPS, misalnya 119.123456">Format tidak valid</span>' : '—')}</td><td class="distance">${item.radius ?? '—'}</td><td>${item.active ? '<span class="status-pill green">Aktif</span>' : `<span class="status-pill neutral">${escapeHtml(item.status || 'Nonaktif')}</span>`}</td></tr>`).join('')}</tbody></table></div><div class="table-footer"><span>Pengelolaan data dilakukan di Google Sheet.</span><span>QR payload: ${escapeHtml(branch.qrPayload || branch.id)}</span></div></section><section class="card qr-card"><h3>QR Code cabang aktif</h3><p>QR statis ini berisi identifier cabang dari Google Sheet.</p><div class="qr-canvas-wrap"><canvas id="branch-qr" width="160" height="160"></canvas><div id="qr-fallback" class="qr-fallback" hidden><span>${escapeHtml(branch.qrPayload || branch.id)}</span></div></div><div class="qr-payload">${escapeHtml(branch.qrPayload || branch.id)}</div><p class="qr-caption">Edit profil cabang langsung di tab “Branches”, lalu muat ulang aplikasi.</p><button class="secondary-button" data-action="print-qr">Cetak QR</button></section>`;
-  drawQr(branch.qrPayload || branch.id);
+  document.querySelector('#page-content > .qr-card')?.remove();
+  $('#page-content').insertAdjacentHTML('beforeend', renderBranchQrCards());
+  state.branches.forEach((item, index) => drawQr(item.qrPayload || item.id, `branch-qr-${index}`, `qr-fallback-${index}`));
   bindContentEvents();
 }
 
-function drawQr(payload) {
-  const canvas = $('#branch-qr');
-  if (window.QRCode && canvas) window.QRCode.toCanvas(canvas, payload, { width: 160, margin: 1, color: { dark: '#1d3557', light: '#ffffff' } }, error => { if (error) showQrFallback(); });
-  else showQrFallback();
+function renderBranchQrCards() {
+  return `<section class="qr-section"><div class="section-heading"><div><h3>QR Code setiap cabang</h3><p>Gunakan QR sesuai lokasi cabang. Payload QR sama dengan ID cabang.</p></div></div><div class="qr-grid">${state.branches.map((item, index) => `<article class="card qr-card ${item.active ? '' : 'qr-card-inactive'}"><div class="qr-card-heading"><div><h3>${escapeHtml(item.name || item.id)}</h3><p>${escapeHtml(item.id)}</p></div>${item.active ? '<span class="status-pill green">Aktif</span>' : `<span class="status-pill neutral">${escapeHtml(item.status || 'Nonaktif')}</span>`}</div><div class="qr-canvas-wrap"><canvas id="branch-qr-${index}" width="160" height="160"></canvas><div id="qr-fallback-${index}" class="qr-fallback" hidden><span>${escapeHtml(item.qrPayload || item.id)}</span></div></div><div class="qr-payload">${escapeHtml(item.qrPayload || item.id)}</div><p class="qr-caption">${item.active ? 'Cetak dan tempel di area absensi cabang ini.' : 'Aktifkan cabang di Google Sheet sebelum digunakan untuk absensi.'}</p><button class="secondary-button" data-action="print-qr">Cetak QR</button></article>`).join('')}</div></section>`;
 }
 
-function showQrFallback() { $('#branch-qr')?.setAttribute('hidden', 'hidden'); $('#qr-fallback')?.removeAttribute('hidden'); }
+function drawQr(payload, canvasId = 'branch-qr', fallbackId = 'qr-fallback') {
+  const canvas = document.getElementById(canvasId);
+  if (window.QRCode && canvas) window.QRCode.toCanvas(canvas, payload, { width: 160, margin: 1, color: { dark: '#1d3557', light: '#ffffff' } }, error => { if (error) showQrFallback(fallbackId, canvasId); });
+  else showQrFallback(fallbackId, canvasId);
+}
+
+function showQrFallback(fallbackId = 'qr-fallback', canvasId = 'branch-qr') { document.getElementById(canvasId)?.setAttribute('hidden', 'hidden'); document.getElementById(fallbackId)?.removeAttribute('hidden'); }
 
 async function saveBranch(event) {
   event.preventDefault();
