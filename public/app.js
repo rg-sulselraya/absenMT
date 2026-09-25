@@ -123,6 +123,21 @@ function clearRememberedSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
+function handleUnauthorized(message = 'Sesi login sudah berakhir. Silakan login kembali.') {
+  const hadSession = Boolean(readSessionToken());
+  clearRememberedSession();
+  state.user = null;
+  state.device = null;
+  state.config = null;
+  stopCamera();
+  const appShell = $('#app-shell');
+  const loginScreen = $('#login-screen');
+  if (appShell) appShell.hidden = true;
+  if (loginScreen) loginScreen.hidden = false;
+  if (location.hash) history.replaceState({}, '', location.pathname + location.search);
+  setLoginStatus(hadSession ? message : '', 'error');
+}
+
 function setLoginStatus(message, tone = 'loading') {
   const status = $('#login-status');
   if (!status) return;
@@ -175,6 +190,7 @@ async function api(endpoint, options = {}) {
       err.code = payload?.code;
       err.details = payload?.details;
       err.status = payload?.status || 400;
+      if (err.code === 'UNAUTHORIZED') handleUnauthorized();
       throw err;
     }
     if (payload.sessionToken) rememberSessionToken(payload.sessionToken);
@@ -198,6 +214,7 @@ async function api(endpoint, options = {}) {
       err.code = payload.code;
       err.details = payload.details;
       err.status = payload.status || response.status;
+      if (err.code === 'UNAUTHORIZED') handleUnauthorized();
       throw err;
     }
     if (payload.sessionToken) rememberSessionToken(payload.sessionToken);
@@ -212,6 +229,7 @@ async function api(endpoint, options = {}) {
     err.code = payload.code;
     err.details = payload.details;
     err.status = response.status;
+    if (err.code === 'UNAUTHORIZED') handleUnauthorized();
     throw err;
   }
   return payload;
@@ -578,8 +596,10 @@ async function processQr(value) {
   } catch (err) {
     const messages = { GPS_INVALID: 'GPS tidak tersedia atau koordinat tidak valid. Aktifkan lokasi lalu coba lagi.', DEVICE_PENDING: 'Perangkat belum diotorisasi Admin.', BRANCH_COORDINATES_MISSING: 'Koordinat cabang belum dikonfigurasi Admin.', RATE_LIMITED: err.message };
     const message = typeof err?.code === 'number' ? geolocationErrorMessage(err) : (messages[err.code] || err.message);
-    showToast(message, 'error');
-    if (note) note.textContent = message;
+    if (err.code !== 'UNAUTHORIZED') {
+      showToast(message, 'error');
+      if (note) note.textContent = message;
+    }
   } finally {
     state.scanner.processing = false;
     setScannerProcessing(false);
